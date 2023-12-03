@@ -214,7 +214,7 @@ The `=` operator is used for pattern matching irrefutably, as well as a separato
 
 `a & b` represents a product type, which is a subtype of both `a` and `b` at the same type.
 
-Note that the union and product operators may also be used as noops in prefix form, to help with aligning declarations vertically:
+Note that the union and product operators may also be used as noops in prefix form, to help with aligning item declarations vertically:
 
 ```rokugo
 let Colors =
@@ -283,10 +283,10 @@ For that, Rokugo allows you to declare variables as mutable, using `var`:
 var x : Int32 = 2
 ```
 
-A new value can be given to the variable by using the `:=` operator.
+A new value can be given to the variable by using `set`.
 
 ```rokugo
-x := 3
+set x = 3
 ```
 
 Note however that `var` variables cannot be captured in [lambdas](#function-as-first-class-values).
@@ -294,7 +294,7 @@ Instead, the variable has to be rebound as a `let` before it's captured.
 
 ```rokugo
 var x : Int32 = 2
-x := 3
+set x = 3
 let x = x  # Shadow the existing `x`, but make it immutable
 let multiply_by_x = fun (y : Int32) = x * y
 ```
@@ -368,6 +368,12 @@ fun ($) (a : String) (b : String) : String =
 Note that Rokugo does not support function overloading.
 For a function to be applicable to many different types of parameters, it has to be polymorphic.
 
+The type of a function which accepts an argument of type `a` and returns a value of type `r` is written as `a -> r`.
+Unlike most operators, `->` is right-associative, so `a -> b -> c` is `a -> (b -> c)`, not `(a -> b) -> c`.
+
+Note that there are no functions which accept more than one argument.
+This helps with programming generically, because there's only one argument passing case you need to worry about - where you pass a single argument to the function.
+
 #### Function application
 
 _Applying_ a function in Rokugo is what you might call _calling_ a function in imperative languages.
@@ -403,9 +409,40 @@ List.map(double, List.of, (1, 2, 3))
 which is not what we want.
 Naturally, the compiler will tell you about this mistake by emitting a type error.
 
-In Rokugo, the function type is written like `a -> r`, where `a` is the function's argument, and `r` is its return value.
-Note that there are no functions which accept more than one argument.
-This helps with programming generically, because there's only one argument passing case you need to worry about - where you pass a single argument to the function.
+Additionally, newlines are not allowed between function arguments (but are fine within arguments themselves.)
+This is to prevent ambiguities with side-effectful functions in `do {}` blocks:
+
+```rokugo
+fun main () : () ~ Console = do {
+    Console.write_line "Hello, world!"
+    Console.write_line "This is another call."
+}
+```
+
+If arguments to a single call were allowed to continue over many lines, the above code would be interpreted as a single call:
+
+```rokugo
+fun main () : () ~ Console = do {
+    Console.write_line "Hello, world!" Console.write_line "This is another call."
+}
+```
+
+which is not what you want.
+If you find yourself writing functions with very many arguments, consider using a record to name the arguments:
+
+```rokugo
+fun function_with_very_many_arguments
+    (args : {
+        first_argument = Int32,
+        second_argument = Int32,
+        third = Int32,
+        fourth = Int32,
+        final = Int32,
+    })
+: () = do {
+    # ...
+}
+```
 
 As an example of this, consider how the pipeline operator is implemented:
 
@@ -477,22 +514,28 @@ Note however that the return type and effects can be omitted, because they can b
 
 ##### Currying and partial application
 
-In addition to lambdas, Rokugo automatically performs [currying](https://en.wikipedia.org/wiki/Currying), which allows for partial application of functions.
+As mentioned before, functions in Rokugo always take one argument, and always return one value.
+For declarations of functions with multiple parameters, Rokugo automatically performs [currying](https://en.wikipedia.org/wiki/Currying).
+
+Functions declared to accept more than one argument are actually functions which return other functions:
 
 ```rokugo
+# This function:
 fun multiply (x : Int32) (y : Int32) : Int32 = x * y
-multiply : Int32 -> Int32 -> Int32
 
-let double = multiply 2
-double : Int32 -> Int32
+# is the same as:
+let multiply =
+    fun (x : Int32) : Int32 -> Int32 =
+        fun (y : Int32) : Int32 =
+            x * y
 ```
 
-In the example above, [type ascription](#-type-ascription-operator) syntax has been used to illustrate the types of `multiply` and `double`.
-`double` is essentially `multiply` with the `x` argument pre-applied to 2.
+Applying `multiply` to one argument and leaving the other one out would be an example of _partial application,_ because we apply only part of the function's arguments.
+Partially applying `multiply` leaves us with another function we can call to obtain the final result:
 
 ```rokugo
+let double = multiply 2
 let four = double 2
-(four == 4) : :true
 ```
 
 #### Function polymorphism
@@ -588,6 +631,8 @@ fun parity x =
 If more than one statement needs to be executed for side effects or extra `let` bindings, `if` can be paired with `do {}`:
 
 ```rokugo
+let CacheEntry = ...  # example module defined elsewhere
+
 fun evict (entry : CacheEntry) : (:evicted | :retained CacheEntry) = do {
     let entry = entry with { eviction_timer = entry.eviction_timer - 1 }
     if entry.eviction_timer == 0 then do {
@@ -610,8 +655,8 @@ fun factorial (n : Nat32) : Nat32 = do {
     var i : Nat32 = 1
     var x : Nat32 = 1
     while i <= n do {
-        x := x * i
-        i := i + 1
+        set x = x * i
+        set i = i + 1
     }
     x
 }
@@ -625,7 +670,7 @@ There is no other meaningful result that could be returned, since the body of a 
 ## Module system
 
 Rokugo has a first-class module system.
-A module groups declarations into a single value.
+A module groups items into a single value.
 At a fundamental level, modules don't seem like much more than syntax sugar for [records](#records), and that's because they mostly _are_.
 
 The two variables below are equal to each other:
@@ -647,7 +692,7 @@ let v2 = module {
 ### Interfaces
 
 The magic of modules comes in with _interfaces_.
-Interfaces allow for specifying what sort of declarations a module must expose to fulfill an API contract.
+Interfaces allow for specifying what sort of items a module must expose to fulfill an API contract.
 
 An interface value is created with the `interface` keyword:
 
@@ -658,8 +703,8 @@ let Add = interface {
 }
 ```
 
-As illustrated in the example above, interfaces contain an arbitrary listing of declarations, but they _do not need to have corresponding implementations._
-`let` bindings in interfaces may have values (that's how interface instantiation happens after all), but `fun` declarations must not provide implementations, since that is the job of modules.
+As illustrated in the example above, interfaces contain an arbitrary listing of items, but they _do not need to have corresponding implementations._
+`let` bindings in interfaces may have values (that's how interface instantiation happens after all), but `fun` items must not provide implementations, since that is the job of modules.
 
 Then, a module can declare that it implements an interface, by specifying it after the `module` keyword:
 
@@ -712,9 +757,53 @@ Greeting1 : Greeting2  # type mismatch
 
 ### Module defaults
 
+Since it would be quite inconvenient to have to write `Int32.Int32` every single time you want to reference the `Int32` type, Rokugo features a way for modules to pose as other values in specific contexts.
+This is what _module defaults_ are.
+
+A module default is declared with the `default` keyword in a module, followed by an item.
+This declaration can be one of the following:
+
+- `default let = expr` - declares the value the module should decay to if not used in a [`.` dot expression](#-field-access-operator)
+- `default fun x = x` - declares the function to use if the module is applied like a function
+- `default effect {}` - declares the effect to use if the module is used as a function's effect
+
+For example, this is how some of the modules in the prelude declare default items:
+
+```rokugo
+let Int32 = module {
+    default let = ... # compiler builtin
+}
+
+let Option = module {
+    default fun a =
+        | :some a
+        | :none
+}
+
+let Console = module {
+    default effect {
+        fun read () : ()
+        fun write (data : Slice Nat8) : ()
+    }
+}
+```
+
+If any of these symbols need to be referred to by name, it is possible to do so by using `Module`, `Module.fun`, or `Module.effect` respectively.
+
+In case a module defines a `default let`, the module itself cannot be used as a value directly, because the compiler uses the module's `default let` instead.
+In that case, when it's needed to reference the module itself, `Module.module` can be used.
+
+For example, to alias the entire standard library `Int16` module to some other name:
+
+```rokugo
+let Short = Int16.module
+```
+
 ### Prelude
 
-The prelude is a special standard library module from which all declarations are brought into scope by default.
+The prelude is a special standard library module from which all items are brought into scope by default.
+
+It contains commonly used symbols like `Iterator`, `List`, etc. so that you don't have to import them manually in every single file.
 
 ### `require` and file scope
 
@@ -724,7 +813,90 @@ Semantically, Rokugo's `require` is similar to Lua's `require`.
 
 The top-level of a Rokugo file is similar to the inner `{}` scope of a `do {}` block: the last expression in the file is its return value, and that value is then the result of calling `require` with the path to that file.
 
-`require` paths rok
+`require` paths are strings, which are structured like `package/path/to/module`.
+In order to refer to modules local to the current package, `./path/to/module` is used.
+
+Example importing a standard library module:
+
+```rokugo
+let Iterator = require "rokugo/iterator"
+```
+
+Using this system, a module file can be created by putting a `module {}` expression at the end:
+
+**File:** src/my_module.rk
+
+```rokugo
+module {
+    fun square (x : Int32) : Int32 = x * x
+}
+```
+
+and then that `module {}` can be imported using `require`:
+
+**File:** src/main.rk
+
+```rokugo
+let MyModule = require "./my_module"
+
+fun main () : () ~ Console = do {
+    Console.write_line (Int32.to_string (MyModule.square 2))
+}
+```
+
+Note that this works with any value.
+It is just as possible to create interface files, and even files from ordinary values such as records - which can be useful for compile-time configuration.
+
+**File:** src/config.rk
+
+```rokugo
+{
+    name = "Example",
+    version = "1.0",
+}
+```
+
+**File:** src/main.rk
+
+```rokugo
+let config = require "./config"
+
+fun main () : () ~ Console = do {
+    Console.write config.name
+    Console.write " "
+    Console.write_line config.version
+}
+```
+
+Privacy can be achieved by ascribing the module with an explicit interface type.
+Note that although interfaces are nominal, it doesn't matter here since the interface is only used to coerce the module into a narrower type.
+
+```rokugo
+module {
+
+    let RenderState = {
+        transform_stack = List Matrix,
+    }
+
+    fun current_transform state =
+        List.last state.transform_stack
+
+    fun push_transform state =
+        state with {
+            transform_stack = state.transform_stack |> List.push (state |> current_transform)
+        }
+
+} : interface {
+
+    let RenderState
+
+    fun push_transform (s : RenderState) : RenderState
+
+}
+```
+
+Modules ascribed with an interface this way have one extra advantage, and it has to do with package-local `require`s.
+Namely, `require` recognizes this idiom and exposes the entire interface to the package, despite the publicly declared interface being narrower.
 
 ## Type system
 
@@ -740,8 +912,8 @@ For instance, all of the following expressions hold true:
 1             : 1
 "abc"         : "abc"
 :my_tag       : :my_tag
-:meters 123.0 : :my_tag 123.0
-:meters 123.0 : :my_tag Decimal
+:meters 123.0 : :meters 123.0
+:meters 123.0 : :meters Decimal
 ```
 
 ### Numbers
@@ -758,7 +930,7 @@ For `Float`, storage sizes of 32 and 64 bits are available under the types `Floa
 
 In addition to specifically-sized `Nat`s and `Int`s, the types `Size` and `Offset` are available.
 Both represent a host-specific `Nat` and `Int` respectively.
-The storage size of both is the same, and the size of `Size` must be large enough to represent the length of any `[Nat8]`.
+The storage size of both is the same, and the size of `Size` must be large enough to represent the length of any `Slice Nat8`.
 
 ### Union types
 
@@ -767,3 +939,5 @@ The storage size of both is the same, and the size of `Size` must be large enoug
 ### Type inference
 
 ## Effect system
+
+## Compilation and runtime
