@@ -171,7 +171,7 @@ More than one value can be attached as the payload:
 :rgba 5 142 240 255
 ```
 
-Tags are mostly used with [unions](#unions), but can be useful on their own to attach unit information to values.
+Tags are mostly used with [unions](#union-types), but can be useful on their own to attach unit information to values.
 
 ### Operators
 
@@ -200,15 +200,18 @@ The following operators have a special meaning to the compiler.
 
 ##### `:` type ascription operator
 
-`expr : T` enforces the `expr` to be of type `T`. If the coercion cannot be performed, a compilation error is emitted.
+`expr : T` coerces the `expr` to be of type `T`.
+If the coercion cannot be performed, a compilation error is emitted.
+
+Type ascription is used in many places throughout this documentation to explicitly denote the types of expressions.
 
 ##### `=` binding operator
 
-The `=` operator is used for pattern matching irrefutably, as well as a separator in `fun` bindings, and in record field bindings.
+The `=` operator is used for pattern matching irrefutably, as well as a separator in `fun` bindings and in record field bindings.
 
 ##### `|` union operator
 
-`a | b` represents a [type union](#unions).
+`a | b` represents a [type union](#union-types).
 
 ##### `&` product operator
 
@@ -239,6 +242,20 @@ The operators are short-circuiting because if the result of the operation is kno
 
 - If the left-hand side of `and` is `:false`, the result of the whole expression is known to be `:false` and as such the right-hand side will not be evaluated.
 - If the left-hand side of `or` is `:true`, the result of the whole expression is known to be `:true` and as such the right-hand side will not be evaluated.
+
+##### `with`
+
+`with` is an operator that allows for updating a record's fields.
+
+For example:
+
+```rokugo
+let joe = { name = "Joe", age = 32 : Nat32 }
+let jane = joe with { name = "Jane" }
+```
+
+`with` returns a new record with the specified fields changed to some other values.
+Fields from the old record can still be accessed like usual in the new record's fields.
 
 #### Precedence
 
@@ -667,6 +684,10 @@ Note that because `while` pretty much always has side effects, a `do` block is _
 The result of a `while` expression is `()`.
 There is no other meaningful result that could be returned, since the body of a `while` may get executed zero or more times.
 
+#### `match` expression
+
+#### `is` expression
+
 ## Module system
 
 Rokugo has a first-class module system.
@@ -868,40 +889,67 @@ fun main () : () ~ Console = do {
 }
 ```
 
-Privacy can be achieved by ascribing the module with an explicit interface type.
-Note that although interfaces are nominal, it doesn't matter here since the interface is only used to coerce the module into a narrower type.
+### Item privacy, public types, and internal types
+
+Rokugo has a notion of an item's _public type_ vs _internal type_ for all items in modules and at the file level.
+
+The _public type_ is the type that comes after `:` in public items.
+This is the type that is visible to external packages.
+
+The _internal type_ is the _actual_ type of the item, and it's what comes after `=`.
+This is the type that modules within the module's owning package see.
 
 ```rokugo
-module {
+let Matrix = require "linalg/matrix"
 
-    let RenderState = {
+module {
+    # RenderState has a public type of {} - an abstract record with no fields.
+    # Its internal type is a record with a field `transform_stack`.
+    let RenderState : {} = {
         transform_stack = List Matrix,
     }
-
-    fun current_transform state =
-        List.last state.transform_stack
-
-    fun push_transform state =
-        state with {
-            transform_stack = state.transform_stack |> List.push (state |> current_transform)
-        }
-
-} : interface {
-
-    let RenderState
-
-    fun push_transform (s : RenderState) : RenderState
-
 }
 ```
 
-Modules ascribed with an interface this way have one extra advantage, and it has to do with package-local `require`s.
-Namely, `require` recognizes this idiom and exposes the entire interface to the package, despite the publicly declared interface being narrower.
+It is also possible to declare `internal` items within modules.
+These items are not visible to external packages, but are visible within the current package.
+
+```rokugo
+let Matrix = require "linalg/matrix"
+
+module {
+    internal let TransformStack = List Matrix
+
+    internal fun current_transform (stack : TransformStack) =
+        List.last stack
+
+    internal fun push_transform (stack : TransformStack) =
+        List.push (stack |> current_transform)
+
+    let RenderState : {} = {
+        transform_stack = TransformStack,
+    }
+
+    fun push (state : RenderState) : RenderState =
+        state with {
+            transform_stack = push_transform state.transform_stack
+        }
+}
+```
+
+It is also possible to declare items which are completely private - this is illustrated with the `require "linalg/matrix"` import in the examples above.
+The `Matrix` item is not exposed within the module returned from the file; it is only a variable local to the file itself.
+
+Do note however that due to the way scoping of `module {}` works, it is impossible to reference internal or public items from within the returned module in private items.
+A good rule of thumb to follow is that imports should be file-local, while any declared items should be `internal` in the returned module.
 
 ## Type system
 
 Rokugo lacks an explicit universe of types.
 Instead, ordinary values are used to express the types of other values.
+
+In addition to that, most types in Rokugo are structural (with the exception of interfaces and effects, which are nominal for robustness reasons.)
+This means that a value of type `a` can be passed in where a value of type `b` is expected, as long as type `a` has all the publicly visible features of `b`.
 
 ### Literals
 
@@ -934,10 +982,99 @@ The storage size of both is the same, and the size of `Size` must be large enoug
 
 ### Union types
 
-### Slices
+Union types express an _either-or_ relationship between two types.
+The type `a | b` describes a value whose type can be _either `a` or `b`_, but not both at the same time.
 
-### Type inference
+Union types in Rokugo are structural just like most other types.
+
+```rokugo
+let AnyNumber1 = Float32 | Int32
+let AnyNumber2 = Float32 | Int32
+
+AnyNumber1 : AnyNumber2
+```
+
+The order of variants within the union does not matter. The two unions below are equivalent:
+
+```rokugo
+let AnyNumber1 = Float32 | Int32
+let AnyNumber2 = Int32 | Float32
+
+AnyNumber1 : AnyNumber2
+```
+
+Unions cannot contain duplicate variants. The following produces a compilation error:
+
+```rokugo
+let UnitOrUnit = () | ()  # error: union contains duplicate variants
+```
+
+This also means that it is not possible to directly use function parameters in union variants, as that would risk colliding with an existing variant.
+
+```rokugo
+fun Option t =
+    # This is invalid, because `t` can be `:none` itself.
+    t | :none
+```
+
+Instead, the parameter has to live inside a tag.
+
+```rokugo
+fun Option t =
+    :some t | :none
+```
+
+It is of course possible to create unions with more than two variants.
+In that case it can be useful to wrap the variants to separate lines.
+The first variant can be prefixed with an additional `|` for vertical alignment.
+
+```rokugo
+let Color =
+    | :rgb Float32 Float32 Float32
+    | :rgba Float32 Float32 Float32 Float32
+    | :lab Float32 Float32 Float32
+```
+
+Since a union can represent one of many different types, it has to be [pattern matched](#match-expression) to extract values out of it.
+
+### Product types
+
+Product types express an _and_ relationship between two types.
+The type `a & b` describes a value whose type is a subtype of _both `a` and `b`_.
+
+This is most useful when combining [records](#records), [interfaces](#interfaces), and [effects](#effect-system).
+
+Note that this is not the same as [product types in OCaml](https://ocaml.org/docs/basic-data-types#tuples).
+In OCaml, product types are a fancy name for tuples, while Rokugo product types are abstract entities for combining type constraints.
+Therefore, it's impossible to have a value whose type satisfies `Float32 & Int32`, and as such only interfaces and effects are allowed as members of product types.
+It is also required that a product type contains _only_ interfaces, xor _only_ effects, because it is impossible for a value to be both an interface and an effect at the same time.
+
+### Abstract types
+
+A type is _abstract_ when its exact implementation is not known at usage site.
+This is the case with types that come from interfaces, because it is impossible to know the exact definition.
+
+For example:
+
+```rokugo
+let I = interface {
+    let T
+    let value : T
+}
+
+let M = module : I {
+    let T = { i = Int32 }
+    let value = { i = 1 }
+}
+
+fun example (mod : I) : () ~ Console =
+    Console.write_line (Int32.to_string mod.value.i)
+```
+
+The above example does not compile, because the type of `mod.value.i` is abstract and opaque: it does not have an `i` field, let alone one that would be an `Int32`.
 
 ## Effect system
 
 ## Compilation and runtime
+
+## Style and naming conventions
