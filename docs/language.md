@@ -107,7 +107,7 @@ Rokugo features the following types of compound literals.
 
 #### Records
 
-Records are unordered, heterogenous containers storing key-value pairs.
+Records are ordered, heterogenous containers storing key-value pairs.
 They are delimited by braces.
 
 ```rokugo
@@ -119,6 +119,29 @@ Record fields can be accessed using the dot `.` operator.
 ```rokugo
 { greeting = "hello", target = "world" }.greeting  # "hello"
 ```
+
+Order of fields is significant, and influences sort order (`(<)` and other comparison operators.)
+For instance, to represent [SemVer](https://semver.org/) with records, you want to order your fields such that `major` is first.
+
+```rokugo
+let SemVer = {
+    major = Nat32,
+    minor = Nat32,
+    patch = Nat32,
+}
+```
+
+Existing fields can be modified, as well as new fields can be appended using the [`with` operator](#with).
+
+Record fields can be initialized in a shorthand way from existing variables by omitting the `= value` part.
+
+```rokugo
+let x = 1
+let y = 2
+let vector = { x, y }
+```
+
+Similar syntax is supported in [record patterns](#record-patterns).
 
 #### Tuples
 
@@ -188,7 +211,7 @@ An operator is made up of a sequence of one or more of the following characters:
 . : @ \
 ```
 
-The operators `.`, `:`, `=`, `@`, `&`, and `|` have a [special meaning to the compiler](#magic-operators) and are reserved.
+The operators `.`, `:`, `=`, `=>`, `@`, `&`, and `|` have a [special meaning to the compiler](#magic-operators) and are reserved.
 
 #### Magic operators
 
@@ -380,6 +403,16 @@ Custom operators can be defined by parenthesizing the operator name:
 ## Concatenation of two strings.
 fun ($) (a : String) (b : String) : String =
     String.cat a b
+```
+
+Custom operator functions can also be referred to (and partially applied) by parenthesizing the operator name.
+
+```rokugo
+# Create an alias for the + operator.
+let add = (+)
+
+# Partially apply (+).
+let add_two = (+) 2
 ```
 
 Note that Rokugo does not support function overloading.
@@ -686,7 +719,306 @@ There is no other meaningful result that could be returned, since the body of a 
 
 #### `match` expression
 
+`match` allows for matching an expression sequentially against a set of [patterns](#patterns).
+It is used postfix after any expression:
+
+```rokugo
+let Rgb = :rgb Float32 Float32 Float32
+let Rgba = :rgba Float32 Float32 Float32 Float32
+let Color = :transparent | Rgb | Rgba
+
+fun to_rgba (color : Color) : Rgba =
+    color match {
+        :transparent => :rgba 0.0 0.0 0.0 0.0
+        :rgb (let r) (let g) (let b) => :rgba r g b 1.0
+        :rgba _ _ _ _ => color
+    }
+```
+
+Each `pattern => expr` pair is called an _arm_.
+
+The patterns in a `match` expression are irrefutable, and together must cover all the posibilities of the input range (be exhaustive.)
+
 #### `is` expression
+
+`is` allows for checking whether an expression matches a single irrefutable [pattern](#patterns).
+
+```rokugo
+let Color = :red | :yellow | :green | :blue
+
+fun yeah (color : Color) : () ~ Console =
+    if color is :blue then
+        Console.write_line "I'm blue daba dee daba dye"
+    else
+        ()
+```
+
+Inside `if` expressions, `is` can bind matched values to variables, which are then visible in the `:true` branch.
+
+```rokugo
+let Shape =
+    | :square { x = Float32, y = Float32, side = Float32 }
+    | :rect { x = Float32, y = Float32, width = Float32, height = Float32 }
+    | :circle { x = Float32, y = Float32, radius = Float32 }
+
+fun diagonal (shape : Shape) : Option Float32 =
+    if shape is :square ({ let side } & _) then
+        :some (side * (sqrt 2.0))
+    else if shape is :rect ({ let width, let height } & _) then
+        :some (sqrt (width * width + height * height))
+    else
+        :none
+```
+
+## Patterns
+
+Throughout all of Rokugo, patterns are the prevalent way of matching values against their shape.
+As opposed to [literals](#literals), which _construct_ values, patterns _destruct_ them.
+
+Patterns can be used in [bindings](#-binding-operator), [`match` expressions](#match-expression), and [`is` expressions](#is-expression).
+
+A pattern can be _refutable_, or _irrefutable_.
+When a pattern is refutable, it means it may not match against all values.
+Irrefutable patterns on the other hand are the opposite - they always match against all values of a given type.
+
+### Wildcard pattern
+
+The wildcard pattern is an irrefutable pattern that matches any value without doing anything to it.
+It is written down using the `_` keyword.
+
+There are two common use cases for the wildcard pattern:
+
+- As a catch-all arm in `match` expressions
+- To explicitly signal that a value is being discarded
+
+For example:
+
+```rokugo
+let NumberWord = :one | :two | :three
+
+fun int_to_word (i : Int32) : Option NumberWord =
+    i match {
+        1 => :some :one
+        2 => :some :two
+        3 => :some :three
+        _ => :none
+    }
+```
+
+### Primitive patterns
+
+Primitive patterns match exactly a single literal primitive value (and are therefore refutable).
+
+They can be used to match on numeric types, `String`s, and `Char`s.
+Their syntax is exactly the same as those types' literals.
+
+### Variable patterns
+
+Variable patterns are irrefutable patterns which create or set existing variables.
+
+For creating new bindings, Rokugo has `let` and `var`.
+
+`let` creates a new, immutable variable, and is the most common way of bringing new names into scope.
+
+```rokugo
+let a = "hello"
+(let a, let b, let c) = ("one", "two", "three")
+```
+
+`var` is similar to `let` but creates a new mutable variable, which can be then modified using the `set` pattern, although do note the latter can only be used on the left-hand side of the [`=` binding operator](#-binding-operator).
+This is because it would be unclear what it's meant to do in the context of [`is`](#is-expression) and [`match`](#match-expression) expressions.
+
+```rokugo
+fun main () : () = do {
+    var a : Int32 = 1
+    var b : Int32 = 2
+    set a = a + 2
+    # Swap two variables around:
+    (set a, set b) = (b, a)
+}
+```
+
+The right-hand side of a `set` pattern is allowed to be a record field, provided that the record is stored within a mutable variable.
+
+```rokugo
+fun main () : () = do {
+    var person = {
+        name = "John",
+        age = 42,
+    }
+    set person.age = person.age + 1
+}
+```
+
+Do note that `var` bindings may only appear inside of `do` blocks.
+This is because modifying variables inside modules would result in `require` order influencing compiled values, and in Rokugo compilation aims to be fully deterministic to help with build reproducibility.
+
+### Or-patterns `|`
+
+An or-pattern matches on two or more sub-patterns and chooses the first that matches.
+Depending on the or-pattern's exhaustiveness, it may be considered refutable or irrefutable.
+
+For example, the following or-pattern is irrefutable:
+
+```rokugo
+let Expr =
+    | :two Float32
+    | :four Float32
+
+fun main () : () ~ Console = do {
+    let e : Expr = :four 2.0
+    e match {
+        :two (let x) | :four (let x) => Console.write_line (x |> Float32.to_string)
+    }
+}
+```
+
+While the following or-pattern is refutable, and therefore the `match` requires an additional catch-all arm:
+
+```rokugo
+let Expr =
+    | :two Float32
+    | :four Float32
+
+fun main () : () ~ Console = do {
+    let e : Expr = :four 2.0
+    e match {
+        :two (let x) => Console.write_line (x |> Float32.to_string)
+        _ => Console.write_line "four? what's that?"
+    }
+}
+```
+
+Similarly to [unions](#union-types), the first operand can be prefixed with an extra pipe `|`.
+This extra pipe can be used even when the pattern is not an or-pattern, leading to a style of `match` similar to OCaml.
+
+```rokugo
+fun main () : () ~ Console = do {
+    let e : Expr = :four 2.0
+    e match {
+        # Note the extra pipe here.
+        | :two (let x) => Console.write_line (x |> Float32.to_string)
+        | _ => Console.write_line "four? what's that?"
+    }
+}
+```
+
+### And-patterns `&`
+
+And-patterns are used to match on the _rest_ left over by another pattern.
+They are irrefutable if both the pattern on the left side of the `&` and the pattern on the right side of the `&` is irrefutable.
+
+They're most useful in conjunction with [tuple](#tuple-patterns) and [record](#record-patterns) patterns, which must exhaustively list all the fields of the matched type.
+In particular, an and-pattern allows for discarding the remaining fields of a tuple or record to match on it non-exhaustively.
+
+```rokugo
+let Player = {
+    x = Float32,
+    y = Float32,
+    color = :red | :blue,
+}
+
+fun and_pattern_example (player : Player) : () = do {
+    # We don't care about `color` or anything else, discard it.
+    ({ let x, let y } & _) = player
+}
+```
+
+### Tuple patterns
+
+Tuple patterns are used to match on tuple values.
+They are irrefutable if all the fields are matched against patterns that are irrefutable.
+
+```rokugo
+let vector = (1 : Int32, 2 : Int32, 3 : Int32)
+(let x, let y, let z) = vector
+```
+
+Note that tuples must be matched exhaustively.
+Fields cannot be left unmatched:
+
+```rokugo
+(1 : Int32, 2 : Int32, 3 : Int32) match {
+    (let x, let y) => ()
+    #            ^ error: tuple has 3 fields, but 2 were matched
+}
+```
+
+To ignore fields, use an [and-pattern](#and-patterns-).
+
+```rokugo
+(1 : Int32, 2 : Int32, 3 : Int32) match {
+    (let x, let y) & _ => ()
+}
+```
+
+### Record patterns
+
+Record patterns are used to match on record-like values.
+Just like [tuple patterns](#tuple-patterns), they are irrefutable if all the fields are matched against patterns that are irrefutable.
+
+Record-like values are values on which the [`.` operator](#-field-access-operator) can be used, and include records, modules, interfaces, and effects.
+
+```rokugo
+fun main () : () ~ Console = do {
+    let vector = { x = 1 : Int32, y = 2 : Int32, z = 3 : Int32 }
+    if vector is { x = 0, y = 0, z = 0 } then
+        Console.write_line "zero vector"
+    else
+        Console.write_line "non-zero vector"
+}
+```
+
+Record patterns support an additional shorthand for destructuring fields to variables of the same name.
+This can be done by using `let x` or `var x` instead of `x = let x` or `x = var x` respectively.
+The most useful use case for this is destructuring imported modules into variables within the current scope.
+
+```rokugo
+{ let Template } = require "rokugo/string"
+
+# instead of
+
+let String = require "rokugo/string"
+let Template = String.Template
+```
+
+### Tag patterns
+
+Tag patterns can be used to match on tag (or tagged) values.
+Since for a tag type which doesn't have a payload the only possible value is the tag itself, tag patterns for payload-less tags are always irrefutable.
+For a tag with a payload attached, a pattern is irrefutable if all the fields are matched against patterns that are irrefutable.
+
+```rokugo
+let astronomical_unit = :meters 149597870700
+:meters (let astronomical_unit_in_meters) = astronomical_unit
+```
+
+### Type patterns
+
+Type patterns can be used to match on the type of a value whose type can be one of many different types.
+They are irrefutable if a value can be of only one type (its type is not a [union](#union-types).)
+
+```rokugo
+type Value =
+    | Int64
+    | Nat64
+    | Float64
+    | String
+
+type ValueType =
+    | :int
+    | :nat
+    | :float
+    | :string
+
+fun type_of (v : Value) : ValueType =
+    v match {
+        _ : Int64 => :int
+        _ : Nat64 => :nat
+        _ : Float64 => :float
+        _ : String => :string
+    }
+```
 
 ## Module system
 
@@ -784,7 +1116,7 @@ This is what _module defaults_ are.
 A module default is declared with the `default` keyword in a module, followed by an item.
 This declaration can be one of the following:
 
-- `default let = expr` - declares the value the module should decay to if not used in a [`.` dot expression](#-field-access-operator)
+- `default = expr` - declares the value the module should decay to if not used in a [`.` dot expression](#-field-access-operator)
 - `default fun x = x` - declares the function to use if the module is applied like a function
 - `default effect {}` - declares the effect to use if the module is used as a function's effect
 
@@ -792,7 +1124,7 @@ For example, this is how some of the modules in the prelude declare default item
 
 ```rokugo
 let Int32 = module {
-    default let = ... # compiler builtin
+    default = ... # compiler builtin
 }
 
 let Option = module {
@@ -811,7 +1143,7 @@ let Console = module {
 
 If any of these symbols need to be referred to by name, it is possible to do so by using `Module`, `Module.fun`, or `Module.effect` respectively.
 
-In case a module defines a `default let`, the module itself cannot be used as a value directly, because the compiler uses the module's `default let` instead.
+In case a module defines a `default` value, the module itself cannot be used as a value directly, because the compiler uses the module's `default` instead.
 In that case, when it's needed to reference the module itself, `Module.module` can be used.
 
 For example, to alias the entire standard library `Int16` module to some other name:
@@ -994,7 +1326,8 @@ let AnyNumber2 = Float32 | Int32
 AnyNumber1 : AnyNumber2
 ```
 
-The order of variants within the union does not matter. The two unions below are equivalent:
+The order of variants within the union is important, and defines the sorting order (`(<)` operator.)
+The two unions below are not equivalent and will sort differently, but they are subtypes of each other and as such implicit conversion happens between them:
 
 ```rokugo
 let AnyNumber1 = Float32 | Int32
@@ -1069,6 +1402,7 @@ let M = module : I {
 
 fun example (mod : I) : () ~ Console =
     Console.write_line (Int32.to_string mod.value.i)
+#                                       ^^^^^^^^^^^ compile error
 ```
 
 The above example does not compile, because the type of `mod.value.i` is abstract and opaque: it does not have an `i` field, let alone one that would be an `Int32`.
