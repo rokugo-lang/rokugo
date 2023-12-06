@@ -1110,46 +1110,57 @@ Greeting1 : Greeting2  # type mismatch
 
 ### Module defaults
 
-Since it would be quite inconvenient to have to write `Int32.Int32` every single time you want to reference the `Int32` type, Rokugo features a way for modules to pose as other values in specific contexts.
+Since it would be quite inconvenient to have to write `Int32.Int32` every single time you want to reference the `Int32` type, Rokugo features a way for modules to pose as other values when not the left-hand side of a [`.` dot expression](#-field-access-operator).
 This is what _module defaults_ are.
 
-A module default is declared with the `default` keyword in a module, followed by an item.
-This declaration can be one of the following:
-
-- `default = expr` - declares the value the module should decay to if not used in a [`.` dot expression](#-field-access-operator)
-- `default fun x = x` - declares the function to use if the module is applied like a function
-- `default effect {}` - declares the effect to use if the module is used as a function's effect
-
+A module default is declared by using a `default` expression.
 For example, this is how some of the modules in the prelude declare default items:
 
 ```rokugo
 let Int32 = module {
-    default = ... # compiler builtin
+    let Int32 = ... # compiler builtin
+    default Int32
 }
 
 let Option = module {
-    default fun a =
+    fun Option a =
         | :some a
         | :none
-}
-
-let Console = module {
-    default effect {
-        fun read () : ()
-        fun write (data : Slice Nat8) : ()
-    }
+    default Option
 }
 ```
 
-If any of these symbols need to be referred to by name, it is possible to do so by using `Module`, `Module.fun`, or `Module.effect` respectively.
+Note that the right-hand side of `default` must be the name of an existing variable within the module.
+While an arbitrary expression could have been allowed, it is important that other items within the module are still able to refer to the module default using a sensible name; therefore an existing variable has to be used.
 
 In case a module defines a `default` value, the module itself cannot be used as a value directly, because the compiler uses the module's `default` instead.
-In that case, when it's needed to reference the module itself, `Module.module` can be used.
+In that case, when it's needed to reference the module itself, `TheModule.module` can be used.
 
 For example, to alias the entire standard library `Int16` module to some other name:
 
 ```rokugo
 let Short = Int16.module
+```
+
+Note that the _module_, not the default value is still used for field resolution in the `.` operator.
+This can be somewhat unwanted in case of defining a module with an effect or interface posing as its default, as then the effect functions will be accessible using `SomeEffect.SomeEffect.the_function`, which is needlessly verbose.
+
+In that case, the effect can be destructured into functions within the module itself using a [record pattern](#record-patterns).
+
+```rokugo
+let Log = module {
+    let Log = effect {
+        fun log (channel : String) (message : String) : ()
+    }
+    { let log } = Log
+    default Log
+}
+
+# Here we use Log as an effect, by decaying the module into its default:
+fun main () : () ~ Log = do {
+    # But we can still refer to Log.Log.log via the alias.
+    Log.log "main" "Hello!"
+}
 ```
 
 ### Prelude
