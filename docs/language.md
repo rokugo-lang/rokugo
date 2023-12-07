@@ -1385,8 +1385,19 @@ Since a union can represent one of many different types, it has to be [pattern m
 
 Product types express an _and_ relationship between two types.
 The type `a & b` describes a value whose type is a subtype of _both `a` and `b`_.
+In other words, it creates a new type whose fields include those of two other types.
 
 This is most useful when combining [records](#records), [interfaces](#interfaces), and [effects](#effect-system).
+
+For records in particular, `a & b` creates a new record which includes the fields of `a`, and then the fields of `b`:
+
+```rokugo
+let Vec2 = { x = Float32, y = Float32 }
+let Vec3 = Vec2 & { z = Float32 }
+let Vec4 = Vec3 & { w = Float32 }
+
+Vec4 : { x = Float32, y = Float32, z = Float32, w = Float32 }
+```
 
 Note that this is not the same as [product types in OCaml](https://ocaml.org/docs/basic-data-types#tuples).
 In OCaml, product types are a fancy name for tuples, while Rokugo product types are abstract entities for combining type constraints.
