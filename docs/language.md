@@ -232,6 +232,14 @@ Type ascription is used in many places throughout this documentation to explicit
 
 The `=` operator is used for pattern matching irrefutably, as well as a separator in `fun` bindings and in record field bindings.
 
+Most commonly, `=` is used to give a name to some value using `let`:
+
+```rokugo
+  let x = 1
+#         ^ value: match on 1
+# ^^^^^ pattern: bind a new variable `x`
+```
+
 ##### `|` union operator
 
 `a | b` represents a [type union](#union-types).
@@ -253,7 +261,7 @@ let Colors =
 
 ##### `@` annotation sigil
 
-Not actually an operator, but a reserved token used for annotations.
+Not actually an operator, but a token reserved for future use in annotations.
 
 ##### `and` and `or`
 
@@ -378,8 +386,8 @@ fun greeting name =
 Note that although explicit types are not given in the function's signature, the function is fully statically typed.
 The type of `name` is inferred from the function's body, which passes `name` as an argument to `String.cat`, expected to be a `String`.
 
-Signature type inference is supported within module-local functions.
-Any functions which are visible outside the current module must specify the function signature explicitly.
+Signature type inference is allowed within [file-local and `internal`](#item-privacy-public-types-and-internal-types) functions.
+Any functions which are visible outside the current package must specify the function signature explicitly.
 This can be done by [ascribing a type](#-type-ascription-operator) to each of the function's parameters, as well as the function itself.
 
 ```rokugo
@@ -388,6 +396,15 @@ fun greeting (name : String) : String =
 ```
 
 This aids in documentation, as well as keeping the interface of the function stable across versions.
+
+There is one exception to this rule, and it's when the return type of the function is dependent on its input values.
+This is precisely what happens in the case of polymorphic types, or types which can be parametrized based on a set of input parameters.
+In that case specifying the return type of the function would result in redundantly having to perform a _type of_ operation by hand, so it needn't be done:
+
+```rokugo
+fun Vec2 (t : _) = { x = t, y = t }
+#               ^ return type is omitted
+```
 
 If a function performs any [side effects](#effect-system), they are also inferred automatically for module-local functions.
 Public functions may specify them using the `~` operator after the function's type.
@@ -770,6 +787,50 @@ fun diagonal (shape : Shape) : Option Float32 =
         :none
 ```
 
+This can be combined with `and`, to chain multiple patterns in series.
+
+```rokugo
+fun move_camera (world : World) : World = do {
+    var world = world
+
+    if (World.query_one world) is :some ((let player : Player, let transform : Transform))
+        and (World.query_one world) is :some ((let entity : Entity, let camera : Camera))
+    then
+        World.update entity transform (mut world)
+    else ()
+
+    world
+}
+```
+
+#### `break` expression
+
+The `break` expression exits out of the current `while` loop.
+
+Since `break` is an expression, it can be used anywhere, such as in `match` arms and on the right-hand side of `or`.
+In those cases, because `break` exits out of the loop immediately, there can be no value produced by the expression, and therefore its type is [`Nothing`](#bottom-type).
+
+```rokugo
+let Instruction =
+    | :increment
+    | :double
+    | :halt
+
+fun interpret (code : List Instruction) : Nat32 = do {
+    var pc : Offset = 0
+    var result : Nat32 = 0
+    while :true {
+        code |> List.at pc match {
+            :increment => set result = result + 1
+            :double => set result = result * 2
+            :halt => break
+        }
+        set pc = pc + 1
+    }
+    result
+}
+```
+
 ## Patterns
 
 Throughout all of Rokugo, patterns are the prevalent way of matching values against their shape.
@@ -1123,7 +1184,7 @@ let Int32 = module {
 }
 
 let Option = module {
-    fun Option a =
+    fun Option (a : _) =
         | :some a
         | :none
     default Option
@@ -1133,8 +1194,8 @@ let Option = module {
 Note that the right-hand side of `default` must be the name of an existing variable within the module.
 While an arbitrary expression could have been allowed, it is important that other items within the module are still able to refer to the module default using a sensible name; therefore an existing variable has to be used.
 
-In case a module defines a `default` value, the module itself cannot be used as a value directly, because the compiler uses the module's `default` instead.
-In that case, when it's needed to reference the module itself, `TheModule.module` can be used.
+In case a module defines a `default` value the module itself cannot be used as a value directly, because the compiler uses the module's `default` instead.
+In that case, when referencing the module itself is needed, `TheModule.module` can be used.
 
 For example, to alias the entire standard library `Int16` module to some other name:
 
@@ -1429,8 +1490,472 @@ fun example (mod : I) : () ~ Console =
 
 The above example does not compile, because the type of `mod.value.i` is abstract and opaque: it does not have an `i` field, let alone one that would be an `Int32`.
 
+### Wildcards
+
+The identifier `_` represents a _wildcard_ type.
+This is a type that accepts any value.
+It is most useful when building polymorphic types for which type parameters do not have to fulfill any sort of contract.
+
+One example of this is `Option t`:
+
+```rokugo
+fun Option (t : _) =
+    | :some t
+    | :none
+```
+
+Note that the `: _` is required because [all public module functions must specify their signatures](#function-declaration).
+
+### Bottom type
+
+The bottom type `Nothing` is a type with no values.
+It coerces to any other type that is more appropriate in a given context.
+
+`Nothing` is returned by all expressions that do not return back to the enclosing expression, such as `break` or `return`.
+
+### Type hierarchy
+
+As a dependently typed language, Rokugo doesn't distinguish between _values_ and _types_ per se; but then the question arises, _what does it mean to even check types in that context?_
+
+TODO
+
+## Ownership and linear typing
+
+Rokugo has two types of values: _data_ and _resources_.
+
+Data are ordinary values which can be freely copied around functions.
+That's because they're really just that - _plain old data_.
+
+Note that Rokugo has no notion of a reference.
+All values are copied around when assigned to variables, passed as arguments, etc.
+The runtime may freely optimize these copies to share memory when that's more efficient, so you shouldn't worry about copies becoming too expensive.
+
+Almost all values in Rokugo are data.
+The only exception to this rule is any type which is a [host resource](#host-resources), such as files, sockets, and other types specific to the host.
+The types of these values are _linear_, which means that once a value of that type is created, it cannot be copied, and must be used _exactly_ once.
+This is opposed to affine typing (as used by [Rust](https://rust-lang.org)), which allows you to use a value one _or_ zero times.
+
+In short, the rules are:
+
+- When a linear value is returned from a host function, it must also be consumed back by another host function.
+- Assigning a linear value to a variable or passing it to a parameter _moves_ it.
+- When a linear value is moved out of a variable, it may no longer be referenced through that variable.
+
+Data types turn into resource types if they contain any resources.
+For example, a `List File` is a resource type, not a data type like `List Nat8`.
+The same thing happens with records, tuples, tags, unions, and other containers.
+
+A simple resource that can be used to demonstrate the linear typing system is `Linear`, which serves as a marker to turn a data type into a resource type.
+(In the example below it is used alone to make the example more minimal.)
+
+```rokugo
+let Linear = require "rokugo/linear"
+
+fun main () : () = do {
+    # Create a new Linear value and store it in `a`.
+    let a = Linear.new ()
+
+    # Now move the Linear out of `a` into `b`.
+    let b = a
+    # The Linear cannot be reached through `a` anymore.
+
+    # After we no longer need the Linear, we must dispose of it.
+    # If there are any code paths where the Linear is not disposed, the compiler will tell us.
+    Linear.drop b
+}
+```
+
+Linear typing interacts with the effect system, too.
+This is reflected in the [continuation types](#continuations), which all have their own rules for calling them.
+Refer to their individual documentation for more info.
+
+### Mutation of resources through function arguments
+
+Since passing a resource to a function argument consumes it, to represent mutation Rokugo requires the function to return the resource back to the caller.
+
+```rokugo
+fun main () : () ~ IO & Throw = do {
+    var file = File.open "hello.txt"
+    (let line, set file) = File.read_line file
+    File.close file
+}
+```
+
+Notice how `File.read_line` returns back the file the line was read from.
+This is because more data can be read from the stream after reading just a single line, so consuming the file wouldn't make much sense.
+
+This can become verbose pretty quickly, so Rokugo has a shorthand syntax for assigning returned arguments back to variables:
+
+```rokugo
+fun main () : () ~ IO & Throw = do {
+    var file = File.open "hello.txt"
+    let line = File.read_line (mut file)
+    File.close file
+}
+```
+
+Any number `n` of `mut` expressions can be used in function arguments to chop the last `n` values off the end of the returned tuple, and assign them back to variables whose values are passed to the function as arguments.
+More generally, the transformation is:
+
+```rokugo
+fun function (x : Int32) (a : T1) (b : T2) (c : T3) : (Int32, T1, T2, T3) =
+    (x + 1, a, b, c)
+
+fun call (a : T1) (b : T2) (c : T3) : () = do {
+    (var a, var b, var c) = (a, b, c)
+    let i = function 10 (mut a) (mut b) (mut c)
+}
+```
+
+When a single-value tuple is returned, the value inside is returned.
+This avoids the need for ugly `(let result,) = expr` unpacking when calling the function.
+
+Just like `set`, `mut` can also be used on fields of records stored in `var`s.
+
 ## Effect system
+
+Rokugo features an algebraic effect system for annotating functions which can cause side effects.
+
+In pure functional programming, the result of a function is only dependent on its input parameters.
+This often turns out to be too inflexible in large codebases, since now every single bit of context has to be passed into functions as a parameter, and every function which wants to modify that bit of context has to return a modified value back.
+In turn this makes code much more brittle when it comes to refactoring; when a new piece of context is needed, it can be hard to add it in without breaking half of the existing codebase.
+
+This also causes problems when trying to perform I/O or other side effects.
+These have to be represented via monads to make the order of computations and side effects explicit, and monads are generally not the most intuitive concept to grasp.
+
+And that's why the effect system exists.
+
+### Effect declarations
+
+Effects are declared using the `effect` keyword, followed by a list of _operation_ functions that form the effect's interface.
+
+Operation functions do not have return types, and instead their last parameter is of a [continuation type](#continuations).
+
+```rokugo
+let Log = effect {
+    fun log (message : String) (cont : Return ())
+}
+```
+
+From a usage perspective, an `effect` declaration roughly desugars to a module with lots of compiler magic:
+
+```rokugo
+let Log = module {
+    let Log = ...  # effect declaration magic
+    default Log
+
+    # Note the extra Log effect on the function.
+    fun log (message : String) (cont : Return ()) : () ~ Log =
+        ...  # call the current handler for the effect
+}
+```
+
+The `Log.log` acts like a regular function and can be called, stored in variables, passed around in arguments, and so on.
+What's magic about it is the continuation parameter `cont : Return ()`, which influences how calling the function works.
+
+More about continuations can be learned in [their own section](#continuations).
+
+### Effect handlers
+
+Calling an operation causes the function to inherit that operation's effect.
+For example, calling `Log.log` causes a function to get the `Log` effect.
+
+However, for `Log.log` to do anything useful, an implementation of the operation has to be provided somewhere down the call stack.
+This is where `handle` expressions come in, which attach an _effect handler_ to a given expression.
+
+```rokugo
+fun do_logging_stuff () : () ~ Log = do {
+    Log.log "Hello, world!"
+    Log.log "This is handled by an effect."
+}
+
+fun main () : () ~ Console = do {
+    # The expression to the left of `handle` is performed with a handler of the effect provided on
+    # the right (in this case `Log`).
+    do_logging_stuff () handle Log {
+        # This is the effect handler, where we declare implementations of the effect's operations.
+        # Type inference can be used to shorten the declarations.
+        fun log message cont = do {
+            Console.write_line message
+            cont ()
+        }
+    }
+}
+```
+
+An effect handler always handles exactly one effect.
+Since `handle` is an infix expression, it can be chained to attach multiple effect handlers:
+
+```rokugo
+fun main () : () = do {
+    some_function () handle A {
+        # ...
+    } handle B {
+        # ...
+    } handle C {
+        # ...
+    }
+}
+```
+
+An idiom that comes out of this naturally is attaching an effect handler to a `do {}` block:
+
+```rokugo
+fun main () : () = do {
+    let v = some_function ()
+    consume_somehow v
+} handle A {
+    # ...
+}
+```
+
+### Continuations
+
+With the basics out of the way, now it's time to talk about that `cont` parameter of operations.
+
+This parameter defines how the operation influences control flow in the calling function.
+The name _continuation_ comes from the fact that it's a function that _continues_ executing the caller's code.
+
+Rokugo defines several continuation types, each with its own restrictions.
+
+#### `Abort`
+
+The `Abort` continuation type does not actually resume execution of the calling function.
+
+Instead, when called, `Abort` exits the program with an exit code.
+
+```rokugo
+let Panic = effect {
+    fun panic (message : String) (abort : Abort)
+}
+
+fun main () : () ~ Console = do {
+    # ...
+} handle Panic {
+    fun panic message abort = do {
+        Console.write "panic: "
+        Console.write_line message
+        Console.write_line "aborting"
+        abort Abort.ExitCode.failure
+    }
+}
+```
+
+In an aborting operation, `Abort` must be the last function called in all control flow paths.
+
+#### `Return`
+
+The `Return` continuation type resumes execution of the calling function.
+
+It must always be called within the effect handler itself, and may not be taken out of scope.
+Additionally, a `Return` continuation must be the last function called in all control flow paths (a _tail call_).
+This means it is impossible to continue executing more code after a `Return` continuation is called.
+
+Control flow-wise, `Return`ing operations act exactly like regular functions.
+After a `Return`ing operation is called, control flow is guaranteed to continue back in the calling function immediately after the handler is done working.
+This makes them as efficient as calling a function.
+
+`Return` takes a single argument, which is the return value of the operation.
+
+```rokugo
+let Log = effect {
+    fun log (message : String) (cont : Return ())
+}
+
+fun main () : () ~ Console = do {
+    Log.log "hello!"
+    Log.log "another log here"
+} handle Log {
+    fun log message cont =
+        cont do {
+            Console.write "log: "
+            Console.write_line message
+        }
+}
+```
+
+Another example, returning a non-`()` value:
+
+```rokugo
+let AutoIncrement = effect {
+    fun next (cont : Return Nat32)
+}
+
+fun with_counter (f : () -> let r ~ AutoIncrement & let e) : r ~ e = do {
+    var counter : Nat32 = 0
+    f () handle AutoIncrement {
+        fun next cont = do {
+            let value = counter
+            set counter = counter + 1
+            cont value
+        }
+    }
+}
+
+fun main () : () ~ Console = with_counter fun () = do {
+    Console.write_line (Nat32.to_string AutoIncrement.next)  # 0
+    Console.write_line (Nat32.to_string AutoIncrement.next)  # 1
+    Console.write_line (Nat32.to_string AutoIncrement.next)  # 2
+}
+```
+
+#### `Continue`
+
+The `Continue` continuation type is used for continuations that may execute later, but are guaranteed to execute before `main` is done running.
+
+As opposed to `Return`, `Continue` continuations may be taken out of the effect handler function's scope.
+They also don't have to be called via a tail call, as additional code may execute after a `Continue` continuation is called.
+However, they may only be called once.
+
+`Continue`s are restrictive as they are to uphold the guarantees of [linear types](#ownership-and-linear-typing).
+To recap, a linear value must be used exactly once.
+This means that if it's captured as part of any continuation, that continuation must also be executed exactly once.
+
+`Continue`s may also declare an effect type, like `Continue r ~ e`.
+This is necessary because the continuation may be executed at any later point in time, and there must be an handler installed for that effect at that point.
+Note that the continuation itself may call back to the operation's effect, and this is denoted in its signature.
+
+Example:
+
+```rokugo
+let LaterCont = Continue () ~ Console & Later
+
+let Later = effect {
+    fun pause (cont : LaterCont)
+}
+
+fun main () : () ~ Console = do {
+    var todo : List LaterCont = List.of ()
+    do {
+        Console.write_line "Creating file"
+        let file = File.create "my_file.txt"
+
+        Later.pause
+
+        Console.write_line "Writing line"
+        File.write_line file "hello!!"
+
+        Later.pause
+
+        Console.write_line "Closing file"
+        File.close file
+    } handle Later {
+        fun pause cont =
+            set todo = List.push cont todo
+    }
+
+    while not (List.is_empty todo) do {
+        Console.write_line "--- resuming ---"
+        let cont = List.pop (mut todo)
+        cont () handle Later {
+            fun pause cont =
+                set todo = List.push cont todo
+        }
+    }
+}
+```
+
+```text
+Creating file
+--- resuming ---
+Writing line
+--- resuming
+Closing file
+```
+
+Note that there is no risk of these continuations running out of order.
+Executing the "Closing file" continuation is only possible after the previous continuation finishes running and calls back to `Later.pause`, giving us another continuation, consuming the previous one in the process.
+
+#### `MaybeContinue`
+
+`MaybeContinue` are continuations which give you full freedom as to how and when to execute them.
+From a usage perspective, `MaybeContinue` continuations are just regular functions.
+They can be called whenever you'd like, and however many times you'd like.
+
+This comes with the limitation that [linear values](#ownership-and-linear-typing) **must not** be carried across calls to `MaybeContinue` operations.
+This is because `MaybeContinue` operations may be executed zero or more times, which would break the guarantees of the linear typing system (as all linear values have to be used _exactly_ once.)
+
+Other than that, `MaybeContinue` does not differ in usage to `Continue`.
+Effects performed by `MaybeContinue` continuations still need to be annotated explicitly using the same syntax `MaybeContinue r ~ e`.
+
+## Multithreading
 
 ## Compilation and runtime
 
+## Embedding
+
+Rokugo is designed to be used as a plugin language for applications.
+Although a rich, standalone platform for interfacing with OS facilities is provided, the Rokugo runtime itself is embeddable within larger programs.
+
+To facilitate this, there are a bunch of mechanisms for interfacing with the _host application_.
+
+### Host protocols
+
+Host protocols are interfaces that contain functions which, when called, are executed by the host application instead of the language runtime.
+
+Host protocols can be created using a regular `interface`, except all functions which are to be executed by the host application should be [annotated](#-annotation-sigil) with the `Host.function` annotation.
+Then, the `Host.protocol` function can be used to retrieve a module implementing the interface.
+
+`Host.protocol` accepts two arguments: the protocol interface, as well as a UUID uniquely identifying that protocol.
+Interface names and identity is fully anonymous, so the UUID is used to sync the compiler, runtime, and host together into agreement as to which protocol is being talked about.
+
+```rokugo
+let Host = require "rokugo/runtime/host"
+
+let IntAdderProtocol = interface {
+    fun add (a : Int32) (b : Int32) : Int32
+}
+
+let IntAdder = Host.protocol IntAdderProtocol "4aa52322-da76-45df-9f78-3361bd70e758"
+```
+
+Host functions have limited capabilities compared to functions implemented in the language runtime.
+Most importantly, they cannot be paused, and therefore cannot call non-`Return` effects.
+
+Since host protocol functions can interact with the outside world in an impure way, it's advised to always wrap them in effect handlers, unless you are absolutely sure a function is pure.
+The example below showcases how this can be done for a simple (albeit incomplete) I/O interface:
+
+```rokugo
+module {
+    let File = Host.resource "d4b4b87b-029c-4026-be66-7ed3271316e9"
+
+    # Naive I/O interface ignoring errors.
+    let IO = effect {
+        fun write (file : File) (bytes : Slice Nat8) (cont : Return File)
+    }
+
+    internal let HostIOProtocol = interface {
+        fun write (file : File) (bytes : Slice Nat8) : File
+    }
+
+    internal let HostIO = Host.protocol HostIOProtocol "32a8bd1e-d82b-40b0-8cab-2d789e993fdc"
+
+    fun with_host_io (f : () -> let r ~ IO & let e) : r ~ e =
+        f () handle IO {
+            fun write file bytes = HostIO.write file bytes
+        }
+}
+```
+
+### Host resources
+
+Host resources are opaque, [linear](#ownership-and-linear-typing) values allocated and managed by the host.
+
+A host resource type can be retrieved by using the `Host.Resource` function.
+
+```rokugo
+let Texture = Host.resource "deecd85a-564a-421f-b164-905aeb7f3694"
+```
+
+Creation and destruction of a host resource value is performed using a [host protocol](#host-protocols).
+Because host resources are linear, there is no risk of running into a [double free](https://en.wikipedia.org/wiki/C_dynamic_memory_allocation#Use_after_free).
+
 ## Style and naming conventions
+
+- Indent with 4 spaces.
+- No newline before the opening brace `{`.
+- Name values with `snake_case`.
+- Name types and modules with `PascalCase`.
+  - Everything that is intended to be used as the right-hand side of type ascription `:` is considered a type.
+- Functions which construct values should be called `new`, and functions which destroy values should be called `drop`.
+  - In case there is more than one constructor, `new` may be swapped out for something else (as is the case with `File.new` and `File.open`.)
