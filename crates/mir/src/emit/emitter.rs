@@ -70,6 +70,8 @@ impl MirEmitter {
     }
 
     // ! Meta
+    /// Adds meta data to the next instruction, which is represented by `span` what is a range of bytes in the
+    /// frontend's source code which generated that instruction. This is useful for debugging and error reporting.
     pub fn meta_span(&mut self, span: Range<usize>) -> &mut Self {
         unsafe {
             self.emit(MirOpCode::MetaSpan);
@@ -80,8 +82,6 @@ impl MirEmitter {
     }
 
     // ! Internal
-    /// # Remarks
-    /// Probably you may want to use [`Self::define_variable`] instead of this function.
     /// # Safety
     /// This function is unsafe because it returns a [`VariableId`] which does not have to be properly registered in
     /// scope, what can cause a compiler or runtime panic. The caller must ensure that the [`VariableId`] is properly.
