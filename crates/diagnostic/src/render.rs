@@ -7,12 +7,17 @@ use tracing::error;
 
 use crate::{files::DiagnosableSources, Diagnostic, Importance, NoteKind, Severity};
 
+/// Kind of output that should be rendered.
+///
+/// Note that if stdout is incapable of rendering color, output will be set to [`Plain`][`Output::Plain`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Output {
     Plain,
     Colored,
 }
 
+/// Render diagnostics to a buffer of bytes.
+/// This buffer of bytes can later be written out to stdout or a file.
 pub fn render(mut output: Output, sources: &Sources, diagnostics: Vec<Diagnostic>) -> Vec<u8> {
     if !StandardStream::stdout(ColorChoice::Auto).supports_color() {
         output = Output::Plain;
