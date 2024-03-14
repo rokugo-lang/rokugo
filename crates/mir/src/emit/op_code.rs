@@ -15,6 +15,8 @@ pub enum MirOpCode {
     ReturnValue,
     /// # Layout
     /// - [`ValueId`] - Id of value which is will be returned from called function
+    /// - [`FunctionId`] - Id of called function
+    /// - [`u8`] - Count of arguments passed to called function
     /// - [[`ValueId`]] - Arguments passed to called function
     Call,
 
@@ -24,13 +26,13 @@ pub enum MirOpCode {
     MetaSpan,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct MirInstruction<'content> {
     pub data: MirInstructionData<'content>,
     pub meta: MirInstructionMeta,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum MirInstructionData<'content> {
     // ! Memory
     DefineInt32(ValueId, i32),
@@ -39,7 +41,7 @@ pub enum MirInstructionData<'content> {
     Call(ValueId, FunctionId, &'content [ValueId]),
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub struct MirInstructionMeta {
     pub span: Option<Range<usize>>,
 }

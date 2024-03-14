@@ -8,7 +8,7 @@ use super::op_code::{MirInstruction, MirInstructionData, MirInstructionMeta};
 
 const COLOR_MEMORY: ColorSpec = ColorSpec {
     fg: Some(Color::Blue),
-    ..ColorSpec::default()
+    intense: true,
 };
 const COLOR_CONTROL_FLOW: ColorSpec = COLOR_MEMORY;
 const COLOR_META: ColorSpec = ColorSpec {
@@ -34,7 +34,10 @@ impl ColoredDisplay for MirInstruction<'_> {
 }
 
 fn write_result(f: &mut dyn WriteColor, result: &ValueId) -> io::Result<()> {
-    write!(f, "{} = ", result)
+    f.set_color(&COLOR_VALUE_ID.into())?;
+    write!(f, "{}", result)?;
+    f.reset()?;
+    write!(f, " = ")
 }
 
 fn write_value_id(f: &mut dyn WriteColor, value_id: &ValueId) -> io::Result<()> {
@@ -54,7 +57,9 @@ impl ColoredDisplay for MirInstructionData<'_> {
             MirInstructionData::DefineInt32(result, value) => {
                 write_result(f, result)?;
                 f.set_color(&COLOR_MEMORY.into())?;
-                write!(f, "DefineInt32 {value}")?;
+                write!(f, "DefineInt32 ")?;
+                f.reset()?;
+                write!(f, "{}", value)?;
             }
             // ! Control flow
             MirInstructionData::ReturnValue(value) => {
@@ -84,7 +89,7 @@ impl ColoredDisplay for MirInstructionMeta {
         f.set_color(&COLOR_META.into())?;
 
         if let Some(span) = &self.span {
-            write!(f, "@MetaSpan: {}..{}", span.start, span.end)?;
+            writeln!(f, "@MetaSpan: {}..{}", span.start, span.end)?;
         }
         Ok(())
     }

@@ -5,7 +5,7 @@ use termcolor::{ColorChoice, StandardStream};
 #[test]
 fn colored_display() {
     let mut mir = MirEmitter::new();
-    let int = mir.define_int32(65);
+    let int = mir.meta_span(0..3).define_int32(65);
     mir.return_value(int);
 
     let mir: MirContent = mir.into();

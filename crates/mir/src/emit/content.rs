@@ -43,13 +43,16 @@ impl<'content> MirContentIterator<'content> {
     unsafe fn read_native<T>(&mut self) -> T {
         let mut value = mem::MaybeUninit::<T>::uninit();
         let ptr = value.as_mut_ptr() as *mut u8;
-        ptr.copy_from_nonoverlapping(self.content.data.as_ptr(), mem::size_of::<T>());
+        ptr.copy_from_nonoverlapping(
+            self.content.data.as_ptr().byte_add(self.index),
+            mem::size_of::<T>(),
+        );
         self.index += mem::size_of::<T>();
         value.assume_init()
     }
 
     unsafe fn read_native_slice<T>(&mut self, count: usize) -> &'content [T] {
-        let ptr = self.content.data.as_ptr() as *const T;
+        let ptr = self.content.data.as_ptr().byte_add(self.index) as *const T;
         let slice = std::slice::from_raw_parts(ptr, count);
         self.index += mem::size_of::<T>() * count;
         slice
@@ -110,6 +113,7 @@ impl ColoredDisplay for MirContent {
         for instruction in self.iter() {
             instruction.fmt_with_color(f)?;
         }
+        f.reset()?;
         Ok(())
     }
 }

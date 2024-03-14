@@ -1,6 +1,6 @@
 use std::{mem, ops::Range};
 
-use rokugo_backend_common::ValueId;
+use rokugo_backend_common::{FunctionId, ValueId};
 
 use super::{content::MirContent, op_code::MirOpCode};
 
@@ -43,15 +43,27 @@ impl MirEmitter {
 
     /// Calls a function which is represented by `function_id` with the arguments which are represented by `arguments`.
     /// And returns the value which is returned from the called function.
-    pub fn call(&mut self, arguments: impl IntoIterator<Item = ValueId>) -> ValueId {
+    pub fn call(
+        &mut self,
+        function_id: FunctionId,
+        arguments: impl IntoIterator<Item = ValueId>,
+    ) -> ValueId {
         unsafe {
             self.emit(MirOpCode::Call);
             let value_id = self.next_value_id();
             self.emit_value_id(value_id);
+            self.emit_function_id(function_id);
 
+            self.emit_u8(0);
+            let position = self.content.data.len();
+
+            let mut count = 0;
             for argument in arguments {
                 self.emit_value_id(argument);
+                count += 1;
             }
+
+            self.content.data[position] = count;
 
             value_id
         }
@@ -86,16 +98,24 @@ impl MirEmitter {
         self.content.emit_native_bytes(op_code);
     }
 
+    unsafe fn emit_function_id(&mut self, function_id: FunctionId) {
+        self.content.emit_native_bytes(function_id);
+    }
+
     unsafe fn emit_value_id(&mut self, value_id: ValueId) {
         self.content.emit_native_bytes(value_id);
     }
 
-    unsafe fn emit_i32(&mut self, int32: i32) {
-        self.content.emit_native_bytes(int32);
+    unsafe fn emit_u8(&mut self, u8: u8) {
+        self.content.emit_native_bytes(u8);
     }
 
     unsafe fn emit_usize(&mut self, usize: usize) {
         self.content.emit_native_bytes(usize);
+    }
+
+    unsafe fn emit_i32(&mut self, i32: i32) {
+        self.content.emit_native_bytes(i32);
     }
 }
 
