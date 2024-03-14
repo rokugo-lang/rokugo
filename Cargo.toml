@@ -1,3 +1,13 @@
 [workspace]
 resolver = "2"
 members = ["crates/*"]
+
+[workspace.dependencies]
+
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"
+
+rokugo-diagnostic = { path = "crates/diagnostic" }
+rokugo-lexis = { path = "crates/lexis" }
+rokugo-source-code = { path = "crates/source-code" }
+rokugo = { path = "crates/rokugo" }

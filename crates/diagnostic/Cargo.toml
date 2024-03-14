@@ -1,0 +1,12 @@
+[package]
+name = "rokugo-diagnostic"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+rokugo-source-code.workspace = true
+
+tracing.workspace = true
+
+codespan-reporting = "0.11.1"

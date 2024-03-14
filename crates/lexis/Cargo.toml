@@ -1,0 +1,8 @@
+[package]
+name = "rokugo-lexis"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rokugo-diagnostic.workspace = true
+rokugo-source-code.workspace = true
