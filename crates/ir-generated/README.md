@@ -1,2 +1,2 @@
 # Rokugo IR Generated
-Rokugo's Intermediate Representation, but without suitable, and optimized data structure required by runtime without development kit.
+Rokugo Intermediate Representation, but without optimized data structures required by the user-facing (non development) runtime.

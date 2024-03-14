@@ -17,8 +17,10 @@ impl MirEmitter {
             content: MirContent { data: Vec::new() },
         }
     }
+}
 
-    // ! Memory
+/// # Memory
+impl MirEmitter {
     /// Defines a value with assigned literal `value` which is represented by `value_id`.
     pub fn define_int32(&mut self, value: i32) -> ValueId {
         unsafe {
@@ -30,8 +32,10 @@ impl MirEmitter {
             value_id
         }
     }
+}
 
-    // ! Control flow
+/// # Control flow
+impl MirEmitter {
     /// Returns from this function with the value which is represented by `value_id`. Function return type must be the
     /// same as type of the value.
     pub fn return_value(&mut self, value_id: ValueId) {
@@ -68,8 +72,10 @@ impl MirEmitter {
             value_id
         }
     }
+}
 
-    // ! Meta
+/// # Meta
+impl MirEmitter {
     /// Adds meta data to the next instruction, which is represented by `span` what is a range of bytes in the
     /// frontend's source code which generated that instruction. This is useful for debugging and error reporting.
     pub fn meta_span(&mut self, span: Range<usize>) -> &mut Self {
@@ -80,8 +86,10 @@ impl MirEmitter {
         }
         self
     }
+}
 
-    // ! Internal
+/// Internal
+impl MirEmitter {
     /// # Safety
     /// This function is unsafe because it returns a [`VariableId`] which does not have to be properly registered in
     /// scope, what can cause a compiler or runtime panic. The caller must ensure that the [`VariableId`] is properly.

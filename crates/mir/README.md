@@ -1,2 +1,2 @@
 # Rokugo MIR
-Tools for Frontend to creating Middle Intermediate Representation, and store structure of source code what is used in next compilation pipeline steps.
+Tools for frontend for creating Middle Intermediate Representation, and storing the code structure which is used in next steps of the compilation pipeline.
