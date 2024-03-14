@@ -208,7 +208,7 @@ An operator is made up of a sequence of one or more of the following characters:
 + - * / %
 < = > ! ?
 ^ & | ~ $
-. : @ \
+. : @
 ```
 
 The operators `.`, `:`, `=`, `=>`, `@`, `&`, and `|` have a [special meaning to the compiler](#magic-operators) and are reserved.
@@ -362,7 +362,7 @@ They also function as a way to execute a sequence of expressions with side effec
 let some_vector = do {
     let x = 2
     let y = x * 5
-    { x: x, y: y }
+    { x = x, y = y }
 }
 # x and y are no longer reachable here
 ```
@@ -1060,13 +1060,13 @@ Type patterns can be used to match on the type of a value whose type can be one 
 They are irrefutable if a value can be of only one type (its type is not a [union](#union-types).)
 
 ```rokugo
-type Value =
+let Value =
     | Int64
     | Nat64
     | Float64
     | String
 
-type ValueType =
+let ValueType =
     | :int
     | :nat
     | :float
