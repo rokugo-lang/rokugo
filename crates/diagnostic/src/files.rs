@@ -8,12 +8,14 @@ use rokugo_source_code::{FileId, Sources};
 
 use crate::Diagnostic;
 
+/// Sources preprocessed for emitting diagnostics.
 pub struct DiagnosableSources<'a> {
     sources: &'a Sources,
     line_starts: HashMap<FileId, Vec<usize>>,
 }
 
 impl<'a> DiagnosableSources<'a> {
+    /// Creates [`DiagnosableSources`] from a set of diagnostics.
     pub fn new(sources: &'a Sources, diagnostics: &[Diagnostic]) -> Self {
         let mut diagnosable_sources = Self {
             sources,

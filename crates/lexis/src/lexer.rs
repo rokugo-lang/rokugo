@@ -5,6 +5,7 @@ use rokugo_source_code::{FileId, SourceSpan};
 
 use crate::token::{Token, TokenKind};
 
+/// Lexer state.
 pub struct Lexer<'a> {
     pub file_id: FileId,
     pub input: &'a str,
@@ -296,6 +297,11 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// Lexis loop.
+    ///
+    /// This lexer pushes tokens out to a [`Vec<Token>`], which can later be read via
+    /// [`Lexer::tokens`]. It may also emit diagnostics while lexing, and these will be visible in
+    /// [`Lexer::diagnostics`].
     pub fn lex(&mut self) {
         loop {
             self.skip_whitespace();
