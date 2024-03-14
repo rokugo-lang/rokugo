@@ -1,0 +1,6 @@
+[package]
+name = "rokugo-mir2ir"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
