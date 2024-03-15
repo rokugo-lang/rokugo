@@ -1,4 +1,4 @@
-use super::Register;
+use crate::register::Register;
 
 /// Flag for register which can be used as unspecified bit-width natural.
 pub trait RegisterN: Register {}

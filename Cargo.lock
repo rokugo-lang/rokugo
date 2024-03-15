@@ -159,6 +159,9 @@ dependencies = [
 [[package]]
 name = "rokugo-ir-generated"
 version = "0.1.0"
+dependencies = [
+ "rokugo-ir",
+]
 
 [[package]]
 name = "rokugo-lexis"

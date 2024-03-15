@@ -5,11 +5,11 @@ use rokugo_common::color::ColoredDisplay;
 use super::op_code::{MirInstruction, MirInstructionData, MirInstructionMeta, MirOpCode};
 
 #[derive(Debug)]
-pub struct MirContent {
+pub struct MirContainer {
     pub(super) data: Vec<u8>,
 }
 
-impl MirContent {
+impl MirContainer {
     pub fn iter(&self) -> MirContentIterator {
         MirContentIterator {
             content: self,
@@ -25,7 +25,7 @@ impl MirContent {
     }
 }
 
-impl<'content> IntoIterator for &'content MirContent {
+impl<'content> IntoIterator for &'content MirContainer {
     type Item = MirInstruction<'content>;
     type IntoIter = MirContentIterator<'content>;
 
@@ -35,7 +35,7 @@ impl<'content> IntoIterator for &'content MirContent {
 }
 
 pub struct MirContentIterator<'content> {
-    content: &'content MirContent,
+    content: &'content MirContainer,
     index: usize,
 }
 
@@ -108,7 +108,7 @@ impl<'content> Iterator for MirContentIterator<'content> {
     }
 }
 
-impl ColoredDisplay for MirContent {
+impl ColoredDisplay for MirContainer {
     fn fmt_with_color(&self, f: &mut dyn termcolor::WriteColor) -> std::io::Result<()> {
         for instruction in self.iter() {
             instruction.fmt_with_color(f)?;

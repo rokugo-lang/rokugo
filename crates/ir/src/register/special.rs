@@ -1,7 +1,4 @@
-use super::{
-    traits::{memory::RegisterAddress, Register},
-    RegisterId, S_START_INDEX,
-};
+use super::{traits::memory::RegisterAddress, Register, RegisterId, S_START_INDEX};
 
 pub struct RegisterSP;
 

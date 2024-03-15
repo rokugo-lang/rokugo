@@ -1,11 +1,8 @@
 use std::mem;
 
 use super::{
-    traits::{
-        naturals::{RegisterN, RegisterN16, RegisterN32, RegisterN64, RegisterN8},
-        Register,
-    },
-    RegisterId, X_START_INDEX,
+    traits::naturals::{RegisterN, RegisterN16, RegisterN32, RegisterN64, RegisterN8},
+    Register, RegisterId, X_START_INDEX,
 };
 
 /// # General Purpose Registers

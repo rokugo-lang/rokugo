@@ -2,19 +2,19 @@ use std::{mem, ops::Range};
 
 use rokugo_backend_common::{FunctionId, ValueId};
 
-use super::{content::MirContent, op_code::MirOpCode};
+use super::{container::MirContainer, op_code::MirOpCode};
 
 #[derive(Debug)]
 pub struct MirEmitter {
     next_value_id: u32,
-    content: MirContent,
+    content: MirContainer,
 }
 
 impl MirEmitter {
     pub fn new() -> Self {
         Self {
             next_value_id: 0,
-            content: MirContent { data: Vec::new() },
+            content: MirContainer { data: Vec::new() },
         }
     }
 }
@@ -133,7 +133,7 @@ impl Default for MirEmitter {
     }
 }
 
-impl From<MirEmitter> for MirContent {
+impl From<MirEmitter> for MirContainer {
     fn from(mir_emitter: MirEmitter) -> Self {
         mir_emitter.content
     }

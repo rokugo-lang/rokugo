@@ -7,6 +7,11 @@ pub mod traits;
 pub(super) const X_START_INDEX: u8 = 0;
 pub(super) const S_START_INDEX: u8 = 128;
 
+pub trait Register {
+    fn id(&self) -> RegisterId;
+}
+
+#[derive(Debug, PartialEq)]
 pub struct RegisterId(u8);
 
 pub const X0: RegisterX = RegisterX::R0;

@@ -1,5 +1,5 @@
 use crate::emit::{
-    content::MirContent,
+    container::MirContainer,
     emitter::MirEmitter,
     op_code::{MirInstruction, MirInstructionData, MirInstructionMeta},
 };
@@ -12,8 +12,8 @@ fn many() {
     let int = mir.meta_span(0..3).define_int32(65);
     mir.return_value(int);
 
-    let content = MirContent::from(mir);
-    let mut iter = content.iter();
+    let container = MirContainer::from(mir);
+    let mut iter = container.iter();
 
     // Assert
     assert!(
