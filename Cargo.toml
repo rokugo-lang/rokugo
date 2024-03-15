@@ -3,10 +3,19 @@ resolver = "2"
 members = ["crates/*"]
 
 [workspace.dependencies]
-
+dashmap = "5.5.3"
+termcolor = "1.1.2"
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
 
+rokugo-common = { path = "crates/common" }
+rokugo-runtime = { path = "crates/runtime" }
+rokugo-ir = { path = "crates/ir" }
+rokugo-ir-generated = { path = "crates/ir-generated" }
+rokugo-mir = { path = "crates/mir" }
+rokugo-mir2ir = { path = "crates/mir2ir" }
+rokugo-backend-common = { path = "crates/backend-common" }
+rokugo-common-tests = { path = "crates/common-tests" }
 rokugo-diagnostic = { path = "crates/diagnostic" }
 rokugo-lexis = { path = "crates/lexis" }
 rokugo-source-code = { path = "crates/source-code" }

@@ -1,0 +1,13 @@
+[package]
+name = "rokugo-mir"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+dashmap.workspace = true
+termcolor.workspace = true
+rokugo-common.workspace = true
+rokugo-backend-common.workspace = true
+
+[dev-dependencies]
+rokugo-common-tests.workspace = true
