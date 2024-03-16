@@ -82,9 +82,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.5.2"
+version = "4.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b230ab84b0ffdf890d5a10abdbc8b83ae1c4918275daea1ab8801f71536b2651"
+checksum = "949626d00e063efc93b6dca932419ceb5432f99769911c0b995f7e884c778813"
 dependencies = [
  "clap_builder",
 ]
@@ -445,6 +445,25 @@ name = "rokugo"
 version = "0.1.0"
 
 [[package]]
+name = "rokugo-backend-common"
+version = "0.1.0"
+
+[[package]]
+name = "rokugo-common"
+version = "0.1.0"
+dependencies = [
+ "termcolor",
+]
+
+[[package]]
+name = "rokugo-common-tests"
+version = "0.1.0"
+dependencies = [
+ "rokugo-backend-common",
+ "rokugo-mir",
+]
+
+[[package]]
 name = "rokugo-diagnostic"
 version = "0.1.0"
 dependencies = [
@@ -454,12 +473,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "rokugo-ir"
+version = "0.1.0"
+
+[[package]]
+name = "rokugo-ir-generated"
+version = "0.1.0"
+
+[[package]]
 name = "rokugo-lexis"
 version = "0.1.0"
 dependencies = [
  "rokugo-diagnostic",
  "rokugo-source-code",
 ]
+
+[[package]]
+name = "rokugo-mir"
+version = "0.1.0"
+dependencies = [
+ "dashmap",
+ "rokugo-backend-common",
+ "rokugo-common",
+ "rokugo-common-tests",
+ "termcolor",
+]
+
+[[package]]
+name = "rokugo-mir2ir"
+version = "0.1.0"
 
 [[package]]
 name = "rokugo-query"
@@ -471,6 +513,10 @@ dependencies = [
  "rustc-hash",
  "tracing",
 ]
+
+[[package]]
+name = "rokugo-runtime"
+version = "0.1.0"
 
 [[package]]
 name = "rokugo-source-code"

@@ -1,0 +1,8 @@
+[package]
+name = "rokugo-common-tests"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rokugo-backend-common.workspace = true
+rokugo-mir.workspace = true
