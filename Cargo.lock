@@ -510,6 +510,7 @@ dependencies = [
  "criterion",
  "dashmap",
  "parking_lot",
+ "rayon",
  "rustc-hash",
  "tracing",
 ]

@@ -4,9 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-dashmap = "5.5.3"
-rustc-hash = "1.1.0"
+dashmap.workspace = true
+rustc-hash.workspace = true
 parking_lot.workspace = true
+rayon.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]

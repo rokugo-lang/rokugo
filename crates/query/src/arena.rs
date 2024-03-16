@@ -25,7 +25,7 @@ pub struct Arena {
 }
 
 #[repr(C)]
-struct Allocation<T> {
+struct Allocation<T: Send + Sync> {
     layout: Layout,
     data: T,
 }
@@ -47,12 +47,18 @@ impl Arena {
         }
     }
 
-    unsafe fn dropper<T>(ptr: NonNull<Allocation<()>>) {
+    unsafe fn dropper<T>(ptr: NonNull<Allocation<()>>)
+    where
+        T: Send + Sync,
+    {
         let ptr = ptr.cast::<Allocation<T>>();
         std::ptr::drop_in_place(addr_of_mut!((*ptr.as_ptr()).data))
     }
 
-    fn alloc_ptr<T>(&self, value: T) -> NonNull<T> {
+    fn alloc_ptr<T>(&self, value: T) -> NonNull<T>
+    where
+        T: Send + Sync,
+    {
         let layout = Layout::new::<Allocation<T>>();
         if layout.size() == 0 {
             return NonNull::dangling();
@@ -97,7 +103,10 @@ impl Arena {
 
     /// Allocate a value in the arena and return a mutable reference to it.
     #[allow(clippy::mut_from_ref)]
-    pub fn alloc<T>(&self, value: T) -> &mut T {
+    pub fn alloc<T>(&self, value: T) -> &mut T
+    where
+        T: Send + Sync,
+    {
         let mut ptr = self.alloc_ptr(value);
         // SAFETY: A new allocation is created every time and is not mutated until the Arena
         // needs to be dropped.
@@ -105,13 +114,19 @@ impl Arena {
     }
 
     /// Same as [`alloc`][Self::alloc], but returns a pinned reference.
-    pub fn alloc_pinned<T>(&self, value: T) -> Pin<&mut T> {
+    pub fn alloc_pinned<T>(&self, value: T) -> Pin<&mut T>
+    where
+        T: Send + Sync,
+    {
         // SAFETY: The memory allocated by `alloc` lives on the heap and lives as long as &self.
         unsafe { Pin::new_unchecked(self.alloc(value)) }
     }
 
     /// Same as [`alloc`][Self::alloc], but returns an [`Own<T>`].
-    pub fn alloc_own<T>(&self, value: T) -> Own<T> {
+    pub fn alloc_own<T>(&self, value: T) -> Own<T>
+    where
+        T: Send + Sync,
+    {
         let ptr = self.alloc_ptr(value);
         Own {
             ptr,
@@ -120,7 +135,10 @@ impl Arena {
     }
 
     /// Same as [`alloc`][Self::alloc], but returns an [`OwnPinned<T>`].
-    pub fn alloc_own_pinned<T>(&self, value: T) -> OwnPinned<T> {
+    pub fn alloc_own_pinned<T>(&self, value: T) -> OwnPinned<T>
+    where
+        T: Send + Sync,
+    {
         let ptr = self.alloc_ptr(value);
         OwnPinned {
             ptr,
@@ -227,6 +245,15 @@ impl Default for Arena {
     }
 }
 
+// SAFETY: Arenas can be sent between threads safely, because all operations are guarded
+// behind mutexes for synchronization.
+unsafe impl Send for Arena {}
+// SAFETY: Arenas can be sent between threads safely, because all operations are guarded
+// behind mutexes for synchronization.
+// The interior `NonNull` pointers are treated like `Box<T>` and therefore are `Send + Sync` due to
+// all allocations having to be `Send + Sync` themselves.
+unsafe impl Sync for Arena {}
+
 /// Shared reference to an element in an arena.
 ///
 /// Unlike a regular reference, `Ref<T>` does not encode a lifetime. Instead it tracks the lifetime
@@ -247,6 +274,10 @@ impl<T: ?Sized> Clone for Ref<T> {
         *self
     }
 }
+
+// SAFETY: Requirements mirror those of &T, because Ref<T> exposes a dynamically borrow-checked &T.
+unsafe impl<T: ?Sized + Sync> Send for Ref<T> {}
+unsafe impl<T: ?Sized + Sync> Sync for Ref<T> {}
 
 /// Owned reference to an element in an arena.
 ///
@@ -270,6 +301,11 @@ impl<T> Own<T> {
     }
 }
 
+// SAFETY: Requirements mirror those of &mut T, because Own<T> exposes a dynamically borrow-checked
+// &mut T.
+unsafe impl<T: ?Sized + Send> Send for Own<T> {}
+unsafe impl<T: ?Sized + Sync> Sync for Own<T> {}
+
 /// Owned, *pinned* reference to an element in the arena.
 ///
 /// This type is similar to [`Own<T>`], but it always returns a pinned mutable reference.
@@ -281,18 +317,22 @@ pub struct OwnPinned<T: ?Sized> {
 
 impl<'a, F, T> OwnPinned<F>
 where
-    F: Future<Output = T> + 'a,
+    F: Future<Output = T> + Send + 'a,
 {
     /// Coerces an `OwnPinned<F>` to an `OwnPinned<dyn Future>`.
     ///
     /// This is a hack to get around [`CoerceUnsized`][std::ops::CoerceUnsized] being unstable.
-    pub fn as_dyn_future(self) -> OwnPinned<dyn Future<Output = T> + 'a> {
+    pub fn as_dyn_send_future(self) -> OwnPinned<dyn Future<Output = T> + Send + 'a> {
         OwnPinned {
             ptr: self.ptr,
             arena_index: self.arena_index,
         }
     }
 }
+
+// SAFETY: Requirements mirror those of Pin<&mut T>, because
+unsafe impl<T: ?Sized + Send> Send for OwnPinned<T> {}
+unsafe impl<T: ?Sized + Sync> Sync for OwnPinned<T> {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct DifferentArenaError;

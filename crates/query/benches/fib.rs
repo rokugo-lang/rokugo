@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use dashmap::DashMap;
-use rokugo_query::{arena::Arena, name::Name, Computer, Query, Scheduler};
+use rokugo_query::{arena::Arena, name::Name, PollLoop, Query, Scheduler, Trampoline};
 
 fn fib_naive(n: u32) -> u32 {
     if n == 0 {
@@ -47,8 +47,12 @@ impl Query for Fib {
 fn fib_queried(n: u32) -> u32 {
     let arena = Arena::new();
     let scheduler = arena.alloc(Scheduler::new(&arena));
-    let mut computer = Computer::new(scheduler);
-    *computer.request_and_trampoline(Fib(n))
+    *scheduler.request_and_trampoline(
+        Fib(n),
+        &Trampoline {
+            poll_loop: PollLoop::SingleThreaded,
+        },
+    )
 }
 
 fn criterion_benchmark(c: &mut Criterion) {

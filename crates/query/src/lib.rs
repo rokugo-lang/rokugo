@@ -19,6 +19,7 @@ use dashmap::{DashMap, DashSet};
 use just_about_anything::JustAboutAnything;
 use name::Name;
 use parking_lot::Mutex;
+use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 use rustc_hash::FxHasher;
 
 struct Cache<'a, Q>
@@ -53,7 +54,8 @@ pub struct Scheduler<'a> {
     /// The scheduler's arena. It is used for allocating things for the scheduler's own use, as well
     /// as letting queries allocate their own data (such as results).
     pub arena: &'a Arena,
-    caches_by_type: DashMap<Name, &'a dyn JustAboutAnything<'a>, BuildHasherDefault<FxHasher>>,
+    caches_by_type:
+        DashMap<Name, &'a (dyn JustAboutAnything<'a> + Sync), BuildHasherDefault<FxHasher>>,
     erased_queue: Mutex<Vec<Box<dyn ErasedQuery>>>,
 
     #[cfg(debug_assertions)]
@@ -104,7 +106,7 @@ impl<'a> Scheduler<'a> {
     ///
     /// Note that this adds the computation to the queue immediately. Therefore it is okay to _not_
     /// await the future returned by this.
-    pub fn query<Q>(&self, query: Q) -> Computation<Q::Result>
+    pub fn query<Q>(&self, query: Q) -> Ongoing<Q::Result>
     where
         Q: Query,
     {
@@ -115,7 +117,7 @@ impl<'a> Scheduler<'a> {
             self.erased_queue.lock().push(Box::new(Some(query)));
         }
 
-        Computation { cell }
+        Ongoing { cell }
     }
 }
 
@@ -123,11 +125,12 @@ impl<'a> Scheduler<'a> {
 ///
 /// Note that this future is fine to drop, because all computations are enqueued immediately
 /// into the [`Computer`].
-pub struct Computation<'a, Q> {
+#[must_use]
+pub struct Ongoing<'a, Q> {
     cell: &'a OnceLock<Q>,
 }
 
-impl<'a, Q> Future for Computation<'a, Q> {
+impl<'a, Q> Future for Ongoing<'a, Q> {
     type Output = &'a Q;
 
     fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -139,18 +142,118 @@ impl<'a, Q> Future for Computation<'a, Q> {
     }
 }
 
-/// Computation loop that makes tasks make forward progress until they're all done.
-pub struct Computer<'a, 's> {
-    scheduler: &'s Scheduler<'a>,
-    future_queue: Vec<OwnPinned<dyn Future<Output = ()> + 's>>,
+/// Multithreading mode for the trampoline's polling loop.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PollLoop {
+    /// Single-threaded mode. Works best when tasks are very short.
+    #[default]
+    SingleThreaded,
+    /// Parallel mode. Works best when tasks are long-lived.
+    Parallel,
 }
 
-impl<'a, 's> Computer<'a, 's> {
-    /// Creates a new computer consuming from the given scheduler.
-    pub fn new(scheduler: &'s Scheduler<'a>) -> Self {
-        Self {
-            scheduler,
-            future_queue: vec![],
+/// Settings for [`Scheduler::trampoline`].
+#[derive(Debug, Clone, Default)]
+pub struct Trampoline {
+    /// Which polling loop to use.
+    pub poll_loop: PollLoop,
+}
+
+/// # Scheduling functions
+///
+/// Note that these require a lifetime of self which is `'a`. This is to allow for futures in the
+/// scheduler to reference the scheduler itself, but this comes at the cost of requiring the
+/// scheduler to be allocated in the [`Arena`] you pass to it.
+impl<'a> Scheduler<'a> {
+    /// Bounce in and out of scheduled tasks until all computations are done.
+    pub fn trampoline(&'a self, trampoline: &Trampoline) {
+        match trampoline.poll_loop {
+            PollLoop::SingleThreaded => self.trampoline_single_threaded(),
+            PollLoop::Parallel => self.trampoline_parallel(),
+        }
+    }
+
+    pub fn request_and_trampoline<Q>(&'a self, query: Q, trampoline: &Trampoline) -> &'a Q::Result
+    where
+        Q: Query,
+    {
+        // Dropping the future here because querying queue up a tasks, which we later trampoline
+        // back into a useful value.
+        drop(self.query(query.clone()));
+        self.trampoline(trampoline);
+        self.cache()
+            .cell(self.arena, query)
+            .get()
+            .expect("query should have computed a result into the cache")
+    }
+
+    fn trampoline_single_threaded(&'a self) {
+        let mut future_queue: Vec<OwnPinned<dyn Future<Output = ()> + Send>> = vec![];
+        loop {
+            while let Some(mut erased_computation) = self.erased_queue.lock().pop() {
+                let future = erased_computation.erased_query(self);
+                future_queue.push(future);
+            }
+
+            let mut i = 0;
+            while i < future_queue.len() {
+                let mut pinned = self.arena.get_mut_pinned(&mut future_queue[i]);
+                let poll = pinned
+                    .as_mut()
+                    .poll(&mut Context::from_waker(&noop_waker()));
+                match poll {
+                    Poll::Pending => (),
+                    Poll::Ready(()) => {
+                        future_queue.swap_remove(i);
+                        continue;
+                    }
+                }
+                i += 1;
+            }
+
+            if future_queue.is_empty() {
+                break;
+            }
+        }
+    }
+
+    fn trampoline_parallel(&'a self) {
+        let mut future_queue: Vec<Option<OwnPinned<dyn Future<Output = ()> + Send>>> = vec![];
+        loop {
+            while let Some(mut erased_computation) = self.erased_queue.lock().pop() {
+                let future = erased_computation.erased_query(self);
+                future_queue.push(Some(future));
+            }
+
+            future_queue.par_iter_mut().for_each(|future| {
+                let mut pinned = self.arena.get_mut_pinned(
+                    future
+                        .as_mut()
+                        .expect("future queue must be cleared of None"),
+                );
+                let poll = pinned
+                    .as_mut()
+                    .poll(&mut Context::from_waker(&noop_waker()));
+                match poll {
+                    Poll::Pending => (),
+                    Poll::Ready(()) => {
+                        *future = None;
+                    }
+                }
+            });
+
+            let mut i = 0;
+            while i < future_queue.len() {
+                if future_queue[i].is_none() {
+                    future_queue.swap_remove(i);
+                } else {
+                    i += 1;
+                }
+            }
+
+            if future_queue.is_empty() {
+                break;
+            }
         }
     }
 }
@@ -173,48 +276,6 @@ fn noop_waker() -> Waker {
     unsafe { Waker::from_raw(RAW) }
 }
 
-impl<'a, 's: 'a> Computer<'a, 's> {
-    /// Bounce in and out of tasks until all computations are done.
-    pub fn trampoline(&mut self) {
-        loop {
-            while let Some(mut erased_computation) = self.scheduler.erased_queue.lock().pop() {
-                let future = erased_computation.erased_query(self.scheduler);
-                self.future_queue.push(future);
-            }
-            self.future_queue.retain_mut(|future| {
-                let mut pinned = self.scheduler.arena.get_mut_pinned(future);
-                match pinned
-                    .as_mut()
-                    .poll(&mut Context::from_waker(&noop_waker()))
-                {
-                    Poll::Ready(()) => false,
-                    Poll::Pending => true,
-                }
-            });
-            if self.future_queue.is_empty() {
-                break;
-            }
-        }
-    }
-
-    /// Make a request for the given computation and [`trampoline`][Self::trampoline] tasks until
-    /// they're all done and have fulfilled the request. Returns the result of the request.
-    pub fn request_and_trampoline<Q>(&mut self, computation: Q) -> &'a Q::Result
-    where
-        Q: Query,
-    {
-        // Dropping the future here because requesting a computation queues tasks, which we
-        // later trampoline back into a useful value.
-        self.scheduler.query(computation.clone());
-        self.trampoline();
-        self.scheduler
-            .cache()
-            .cell(self.scheduler.arena, computation)
-            .get()
-            .expect("query should have computed a result into the cache")
-    }
-}
-
 /// Represents a computation type.
 ///
 /// This can be thought of as a *function call descriptor.* It stores the arguments needed to call
@@ -228,25 +289,28 @@ pub trait Query: 'static + Clone + Debug + Eq + Hash + Send + Sync {
 
     type Result: Send + Sync;
 
-    fn run<'a>(self, scheduler: &'a Scheduler<'_>) -> impl Future<Output = Self::Result> + 'a;
+    fn run<'a>(
+        self,
+        scheduler: &'a Scheduler<'_>,
+    ) -> impl Future<Output = Self::Result> + Send + Sync + 'a;
 }
 
 // Object-safe version of `Compute`.
-trait ErasedQuery {
-    fn erased_query<'a, 's: 'a>(
+trait ErasedQuery: Send {
+    fn erased_query<'a>(
         &mut self,
-        scheduler: &'s Scheduler<'a>,
-    ) -> OwnPinned<dyn Future<Output = ()> + 'a>;
+        scheduler: &'a Scheduler<'a>,
+    ) -> OwnPinned<dyn Future<Output = ()> + Send + 'a>;
 }
 
 impl<Q> ErasedQuery for Option<Q>
 where
     Q: Query,
 {
-    fn erased_query<'a, 's: 'a>(
+    fn erased_query<'a>(
         &mut self,
-        scheduler: &'s Scheduler<'a>,
-    ) -> OwnPinned<dyn Future<Output = ()> + 'a> {
+        scheduler: &'a Scheduler<'a>,
+    ) -> OwnPinned<dyn Future<Output = ()> + Send + 'a> {
         let query = self.take().expect("erased_query must only be called once");
         let cache = scheduler.cache();
         let cell = cache.cell(scheduler.arena, query.clone());
@@ -260,6 +324,6 @@ where
                     .expect("cell may only be computed once");
                 cache.enqueued.remove(&query);
             })
-            .as_dyn_future()
+            .as_dyn_send_future()
     }
 }

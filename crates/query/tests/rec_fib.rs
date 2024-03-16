@@ -1,4 +1,4 @@
-use rokugo_query::{arena::Arena, name::Name, Computer, Query, Scheduler};
+use rokugo_query::{arena::Arena, name::Name, PollLoop, Query, Scheduler, Trampoline};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct Fib(u32);
@@ -26,7 +26,25 @@ impl Query for Fib {
 fn rec_fib() {
     let arena = Arena::new();
     let scheduler = arena.alloc(Scheduler::new(&arena));
-    let mut computer = Computer::new(scheduler);
-    let fib = computer.request_and_trampoline(Fib(30));
+    let fib = scheduler.request_and_trampoline(Fib(30), &Trampoline::default());
     assert_eq!(*fib, 832040);
+}
+
+#[test]
+fn threading() {
+    let arena = Arena::new();
+    let scheduler = arena.alloc(Scheduler::new(&arena));
+    let fib_st = scheduler.request_and_trampoline(
+        Fib(30),
+        &Trampoline {
+            poll_loop: PollLoop::SingleThreaded,
+        },
+    );
+    let fib_mt = scheduler.request_and_trampoline(
+        Fib(30),
+        &Trampoline {
+            poll_loop: PollLoop::Parallel,
+        },
+    );
+    assert_eq!(fib_st, fib_mt);
 }
