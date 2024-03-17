@@ -1,5 +1,6 @@
 use std::{
     alloc::Layout,
+    error::Error,
     fmt,
     future::Future,
     pin::Pin,
@@ -343,6 +344,8 @@ impl fmt::Display for DifferentArenaError {
         f.write_str("reference was allocated in a different arena")
     }
 }
+
+impl Error for DifferentArenaError {}
 
 #[cfg(test)]
 mod tests {
