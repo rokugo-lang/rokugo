@@ -20,7 +20,7 @@ fn emit_and_assert<const LENGTH: usize>(f: fn(&mut IrEmitter) -> [IrInstruction<
 }
 
 #[test]
-fn many() {
+fn load_nat32() {
     emit_and_assert(|ir| {
         let chill = RegisterChill::default();
         let register = ir.alloc_register_nat32(chill.clone()).unwrap();
