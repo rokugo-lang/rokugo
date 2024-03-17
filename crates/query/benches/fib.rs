@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use dashmap::DashMap;
-use rokugo_query::{arena::Arena, name::Name, PollLoop, Query, Scheduler, Trampoline};
+use rokugo_query::{arena::Arena, Name, PollLoop, Query, Scheduler, Trampoline};
 
 fn fib_naive(n: u32) -> u32 {
     if n == 0 {

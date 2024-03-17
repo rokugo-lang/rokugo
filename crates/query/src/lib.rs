@@ -2,7 +2,7 @@
 
 pub mod arena;
 mod just_about_anything;
-pub mod name;
+mod name;
 
 use std::{
     any::type_name,
@@ -14,13 +14,15 @@ use std::{
     task::{Context, Poll, RawWaker, RawWakerVTable, Waker},
 };
 
-use arena::{Arena, OwnPinned};
 use dashmap::{DashMap, DashSet};
 use just_about_anything::JustAboutAnything;
-use name::Name;
 use parking_lot::Mutex;
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 use rustc_hash::FxHasher;
+
+use crate::arena::{Arena, OwnPinned};
+
+pub use name::Name;
 
 struct Cache<'a, Q>
 where
@@ -104,8 +106,41 @@ impl<'a> Scheduler<'a> {
 
     /// Request a computation from the [`Computer`] that consumes tasks from this scheduler.
     ///
-    /// Note that this adds the computation to the queue immediately. Therefore it is okay to _not_
-    /// await the future returned by this.
+    /// Note that this adds the computation to the queue immediately. This is in contrast to most
+    /// futures, which will not cause any work to be performed until they're `.await`ed.
+    /// However, not awaiting the future is useless, as queries are assumed to be computations
+    /// without side effects - therefore you should always ensure the resulting future is awaited.
+    ///
+    /// # Querying efficiently
+    ///
+    /// Writing efficient queries generally boils down to starting as many queries as possible at a
+    /// given time, and awaiting their results *after* these queries have been made. Like so:
+    ///
+    /// ```
+    /// # use rokugo_query::*;
+    /// # #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    /// # struct SomeQuery;
+    /// # impl Query for SomeQuery {
+    /// #     const NAME: Name = Name::new("SomeQuery");
+    /// #     type Result = i32;
+    /// #     async fn run(self, scheduler: &Scheduler<'_>) -> Self::Result { 123 }
+    /// # }
+    /// #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    /// struct AddTwo;
+    ///
+    /// impl Query for AddTwo {
+    ///     const NAME: Name = Name::new("AddTwo");
+    ///
+    ///     type Result = i32;
+    ///
+    ///     async fn run(self, scheduler: &Scheduler<'_>) -> Self::Result {
+    ///         // NOTE: Two queries are fired in parallel here.
+    ///         let a = scheduler.query(SomeQuery);
+    ///         let b = scheduler.query(SomeQuery);
+    ///         a.await + b.await
+    ///     }
+    /// }
+    /// ```
     pub fn query<Q>(&self, query: Q) -> Ongoing<Q::Result>
     where
         Q: Query,

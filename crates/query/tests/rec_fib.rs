@@ -1,4 +1,4 @@
-use rokugo_query::{arena::Arena, name::Name, PollLoop, Query, Scheduler, Trampoline};
+use rokugo_query::{arena::Arena, Name, PollLoop, Query, Scheduler, Trampoline};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct Fib(u32);
