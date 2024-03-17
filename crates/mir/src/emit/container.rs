@@ -17,11 +17,13 @@ impl MirContainer {
         }
     }
 
-    pub(super) unsafe fn emit_native_bytes<T>(&mut self, value: T) {
-        self.data.extend_from_slice(std::slice::from_raw_parts(
-            &value as *const _ as *const u8,
-            std::mem::size_of::<T>(),
-        ));
+    pub(super) fn emit_native_bytes<T>(&mut self, value: T) {
+        // SAFETY: This is safe, because `T` lifetime does not exceed the lifetime of slice, and this slice is only used
+        // for copying bytes.
+        let slice = unsafe {
+            std::slice::from_raw_parts(&value as *const _ as *const u8, std::mem::size_of::<T>())
+        };
+        self.data.extend_from_slice(slice);
     }
 }
 
