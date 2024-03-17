@@ -330,7 +330,8 @@ where
     }
 }
 
-// SAFETY: Requirements mirror those of Pin<&mut T>, because
+// SAFETY: Requirements mirror those of Pin<&mut T>, because `OwnPinned<T>` exposes a dynamically
+// borrow-checked `&mut T`.
 unsafe impl<T: ?Sized + Send> Send for OwnPinned<T> {}
 unsafe impl<T: ?Sized + Sync> Sync for OwnPinned<T> {}
 
