@@ -8,9 +8,14 @@ fn emit_and_assert<const LENGTH: usize>(
 ) {
     let mut mir = MirEmitter::new();
     let data = f(&mut mir);
-    for (i, instruction) in mir.iter().enumerate() {
+
+    let mut i = 0;
+    for instruction in mir.iter() {
         assert_eq!(data[i], instruction.data);
+        i += 1;
     }
+
+    assert_eq!(data.len(), i);
 }
 
 fn emit_meta_and_assert(f: fn(&mut MirEmitter) -> MirInstructionMeta) {

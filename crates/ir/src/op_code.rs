@@ -1,4 +1,4 @@
-use crate::register::RegisterId;
+use crate::register::{chill::RegisterChill, RegisterId};
 
 #[derive(Debug)]
 #[repr(u16)]
@@ -25,6 +25,9 @@ pub enum IrOpCode {
 #[derive(Debug, PartialEq)]
 pub enum IrInstruction<'container> {
     // ! Local Memory
+    AllocRegisterNat32(RegisterId, RegisterChill),
+    DropRegister(RegisterId),
     LoadNat32(RegisterId, u32),
+    // ! Control Flow
     Call(&'container [u8]),
 }
