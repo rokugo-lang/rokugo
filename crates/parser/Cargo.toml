@@ -1,10 +1,15 @@
 [package]
-name = "rokugo-lexis"
+name = "rokugo-parser"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 enum-iterator.workspace = true
 
+rokugo-ast.workspace = true
 rokugo-diagnostic.workspace = true
+rokugo-lexis.workspace = true
 rokugo-source-code.workspace = true
+
+[dev-dependencies]
+indoc.workspace = true

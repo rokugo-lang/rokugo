@@ -16,23 +16,13 @@ pub enum Output {
     Colored,
 }
 
-/// Render diagnostics to a buffer of bytes.
-/// This buffer of bytes can later be written out to stdout or a file.
-pub fn render(mut output: Output, sources: &Sources, diagnostics: Vec<Diagnostic>) -> Vec<u8> {
-    if !StandardStream::stdout(ColorChoice::Auto).supports_color() {
-        output = Output::Plain;
-    }
-
-    let mut plain = NoColor::new(vec![]);
-    let mut colored = Ansi::new(vec![]);
-    let stream: &mut dyn WriteColor = match output {
-        Output::Plain => &mut plain,
-        Output::Colored => &mut colored,
-    };
-
-    let files = DiagnosableSources::new(sources, &diagnostics);
+fn render_rec(
+    stream: &mut dyn WriteColor,
+    sources: &DiagnosableSources,
+    diagnostics: Vec<Diagnostic>,
+) {
     for diagnostic in diagnostics {
-        let diagnostic = codespan_reporting::diagnostic::Diagnostic {
+        let codespan_diagnostic = codespan_reporting::diagnostic::Diagnostic {
             severity: match diagnostic.severity {
                 Severity::Bug => codespan_reporting::diagnostic::Severity::Bug,
                 Severity::Error => codespan_reporting::diagnostic::Severity::Error,
@@ -66,11 +56,35 @@ pub fn render(mut output: Output, sources: &Sources, diagnostics: Vec<Diagnostic
                 })
                 .collect(),
         };
-        match codespan_reporting::term::emit(stream, &Config::default(), &files, &diagnostic) {
+        match codespan_reporting::term::emit(
+            stream,
+            &Config::default(),
+            sources,
+            &codespan_diagnostic,
+        ) {
             Ok(_) => (),
-            Err(err) => error!(?diagnostic, ?err, "could not emit diagnostic"),
+            Err(err) => error!(?codespan_diagnostic, ?err, "could not emit diagnostic"),
         }
+        render_rec(stream, sources, diagnostic.children);
     }
+}
+
+/// Render diagnostics to a buffer of bytes.
+/// This buffer of bytes can later be written out to stdout or a file.
+pub fn render(mut output: Output, sources: &Sources, diagnostics: Vec<Diagnostic>) -> Vec<u8> {
+    if !StandardStream::stdout(ColorChoice::Auto).supports_color() {
+        output = Output::Plain;
+    }
+
+    let mut plain = NoColor::new(vec![]);
+    let mut colored = Ansi::new(vec![]);
+    let stream: &mut dyn WriteColor = match output {
+        Output::Plain => &mut plain,
+        Output::Colored => &mut colored,
+    };
+
+    let files = DiagnosableSources::new(sources, &diagnostics);
+    render_rec(stream, &files, diagnostics);
 
     match output {
         Output::Plain => plain.into_inner(),

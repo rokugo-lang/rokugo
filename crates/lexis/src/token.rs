@@ -1,9 +1,15 @@
-use std::ops::Range;
+use std::{fmt, ops::Range};
+
+use enum_iterator::Sequence;
 
 /// Kind of a token.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Sequence)]
 pub enum TokenKind {
     Error,
+
+    /// Not actually emitted by the lexer, but used by the parser to signal that it reached
+    /// EOF without having to wrap the `TokenKind` in an [`Option<T>`].
+    EndOfFile,
 
     // Metadata
     Comment,
@@ -63,6 +69,7 @@ pub enum TokenKind {
     Pipe,      // |
     Ampersand, // &
     At,        // @
+    Arrow,     // ->
 }
 
 /// A single token, representing a specific lexical construct at a given source span.
@@ -70,15 +77,21 @@ pub enum TokenKind {
 /// [`Token`]s do not store any information about the contents of the source span. The lexer will
 /// only read characters and categorise them into tokens without trying to parse them into usable
 /// data.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Token {
     pub kind: TokenKind,
-    pub span: Range<usize>,
+    pub range: Range<usize>,
+}
+
+impl fmt::Debug for Token {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?} @ {:?}", self.kind, self.range)
+    }
 }
 
 impl TokenKind {
-    /// Construct a token of this kind, at the given span.
-    pub fn at(self, span: Range<usize>) -> Token {
-        Token { kind: self, span }
+    /// Construct a token of this kind, at the given range of characters.
+    pub fn at(self, range: Range<usize>) -> Token {
+        Token { kind: self, range }
     }
 }

@@ -275,6 +275,7 @@ impl<'a> Lexer<'a> {
             "=" => TokenKind::Equals,
             "|" => TokenKind::Pipe,
             "&" => TokenKind::Ampersand,
+            "->" => TokenKind::Arrow,
             "@" => TokenKind::At,
             _ => TokenKind::Operator,
         };
