@@ -5,3 +5,4 @@ edition = "2021"
 
 [dependencies]
 rokugo-ir.workspace = true
+rokugo-diagnostic.workspace = true

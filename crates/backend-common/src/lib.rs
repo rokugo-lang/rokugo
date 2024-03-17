@@ -26,4 +26,6 @@ pub struct UnstableTypeId(u64);
 impl UnstableTypeId {
     /// The type of a value that is nothing.
     pub const VOID: Self = Self(0);
+    /// The 32-bit natural type.
+    pub const NAT32: Self = Self(1);
 }

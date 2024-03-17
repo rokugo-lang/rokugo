@@ -10,8 +10,8 @@ pub struct MirContainer {
 }
 
 impl MirContainer {
-    pub fn iter(&self) -> MirContentIterator {
-        MirContentIterator {
+    pub fn iter(&self) -> MirContainerIterator {
+        MirContainerIterator {
             content: self,
             index: 0,
         }
@@ -25,21 +25,21 @@ impl MirContainer {
     }
 }
 
-impl<'content> IntoIterator for &'content MirContainer {
-    type Item = MirInstruction<'content>;
-    type IntoIter = MirContentIterator<'content>;
+impl<'container> IntoIterator for &'container MirContainer {
+    type Item = MirInstruction<'container>;
+    type IntoIter = MirContainerIterator<'container>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-pub struct MirContentIterator<'content> {
-    content: &'content MirContainer,
+pub struct MirContainerIterator<'container> {
+    content: &'container MirContainer,
     index: usize,
 }
 
-impl<'content> MirContentIterator<'content> {
+impl<'container> MirContainerIterator<'container> {
     unsafe fn read_native<T>(&mut self) -> T {
         let mut value = mem::MaybeUninit::<T>::uninit();
         let ptr = value.as_mut_ptr() as *mut u8;
@@ -51,7 +51,7 @@ impl<'content> MirContentIterator<'content> {
         value.assume_init()
     }
 
-    unsafe fn read_native_slice<T>(&mut self, count: usize) -> &'content [T] {
+    unsafe fn read_native_slice<T>(&mut self, count: usize) -> &'container [T] {
         let ptr = self.content.data.as_ptr().byte_add(self.index) as *const T;
         let slice = std::slice::from_raw_parts(ptr, count);
         self.index += mem::size_of::<T>() * count;
@@ -61,10 +61,14 @@ impl<'content> MirContentIterator<'content> {
     unsafe fn read_instruction(
         &mut self,
         meta: &mut MirInstructionMeta,
-    ) -> Option<MirInstructionData<'content>> {
+    ) -> Option<MirInstructionData<'container>> {
         let op_code: MirOpCode = self.read_native();
         match op_code {
             // ! Memory
+            MirOpCode::DefineNat32 => Some(MirInstructionData::DefineNat32(
+                self.read_native(),
+                self.read_native(),
+            )),
             MirOpCode::DefineInt32 => Some(MirInstructionData::DefineInt32(
                 self.read_native(),
                 self.read_native(),
@@ -91,8 +95,8 @@ impl<'content> MirContentIterator<'content> {
     }
 }
 
-impl<'content> Iterator for MirContentIterator<'content> {
-    type Item = MirInstruction<'content>;
+impl<'container> Iterator for MirContainerIterator<'container> {
+    type Item = MirInstruction<'container>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.index >= self.content.data.len() {

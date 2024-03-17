@@ -2,7 +2,10 @@ use std::{mem, ops::Range};
 
 use rokugo_backend_common::{FunctionId, ValueId};
 
-use super::{container::MirContainer, op_code::MirOpCode};
+use super::{
+    container::{MirContainer, MirContainerIterator},
+    op_code::{MirInstruction, MirOpCode},
+};
 
 #[derive(Debug)]
 pub struct MirEmitter {
@@ -17,17 +20,33 @@ impl MirEmitter {
             content: MirContainer { data: Vec::new() },
         }
     }
+
+    pub fn iter(&self) -> MirContainerIterator {
+        self.content.iter()
+    }
 }
 
 /// # Memory
 impl MirEmitter {
+    /// Defines a value with assigned literal `value` which is represented by `value_id`.
+    pub fn define_nat32(&mut self, value: u32) -> ValueId {
+        unsafe {
+            self.emit(MirOpCode::DefineNat32);
+            let value_id = self.next_value_id();
+            self.emit_value_id(value_id);
+            self.emit_nat32(value);
+
+            value_id
+        }
+    }
+
     /// Defines a value with assigned literal `value` which is represented by `value_id`.
     pub fn define_int32(&mut self, value: i32) -> ValueId {
         unsafe {
             self.emit(MirOpCode::DefineInt32);
             let value_id = self.next_value_id();
             self.emit_value_id(value_id);
-            self.emit_i32(value);
+            self.emit_int32(value);
 
             value_id
         }
@@ -58,7 +77,7 @@ impl MirEmitter {
             self.emit_value_id(value_id);
             self.emit_function_id(function_id);
 
-            self.emit_u8(0);
+            self.emit_nat8(0);
             let position = self.content.data.len();
 
             let mut count = 0;
@@ -81,8 +100,8 @@ impl MirEmitter {
     pub fn meta_span(&mut self, span: Range<usize>) -> &mut Self {
         unsafe {
             self.emit(MirOpCode::MetaSpan);
-            self.emit_usize(span.start);
-            self.emit_usize(span.end);
+            self.emit_nat_size(span.start);
+            self.emit_nat_size(span.end);
         }
         self
     }
@@ -114,16 +133,20 @@ impl MirEmitter {
         self.content.emit_native_bytes(value_id);
     }
 
-    unsafe fn emit_u8(&mut self, u8: u8) {
-        self.content.emit_native_bytes(u8);
+    unsafe fn emit_nat_size(&mut self, nat_size: usize) {
+        self.content.emit_native_bytes(nat_size);
     }
 
-    unsafe fn emit_usize(&mut self, usize: usize) {
-        self.content.emit_native_bytes(usize);
+    unsafe fn emit_nat32(&mut self, nat32: u32) {
+        self.content.emit_native_bytes(nat32);
     }
 
-    unsafe fn emit_i32(&mut self, i32: i32) {
-        self.content.emit_native_bytes(i32);
+    unsafe fn emit_nat8(&mut self, nat8: u8) {
+        self.content.emit_native_bytes(nat8);
+    }
+
+    unsafe fn emit_int32(&mut self, int32: i32) {
+        self.content.emit_native_bytes(int32);
     }
 }
 
@@ -136,5 +159,14 @@ impl Default for MirEmitter {
 impl From<MirEmitter> for MirContainer {
     fn from(mir_emitter: MirEmitter) -> Self {
         mir_emitter.content
+    }
+}
+
+impl<'container> IntoIterator for &'container MirEmitter {
+    type Item = MirInstruction<'container>;
+    type IntoIter = MirContainerIterator<'container>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.content.iter()
     }
 }

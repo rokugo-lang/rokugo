@@ -160,6 +160,7 @@ dependencies = [
 name = "rokugo-ir-generated"
 version = "0.1.0"
 dependencies = [
+ "rokugo-diagnostic",
  "rokugo-ir",
 ]
 

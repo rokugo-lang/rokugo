@@ -19,7 +19,10 @@ fn many() {
     assert!(
         Some(MirInstruction {
             data: MirInstructionData::DefineInt32(int, 65),
-            meta: MirInstructionMeta { span: Some(0..3) }
+            meta: MirInstructionMeta {
+                span: Some(0..3),
+                ..Default::default()
+            }
         }) == iter.next()
     );
     assert!(

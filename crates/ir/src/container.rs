@@ -45,6 +45,7 @@ impl<'container> IrContainerIterator<'container> {
             IrOpCode::LoadNat32 => {
                 IrInstruction::LoadNat32(self.read_register_id(), self.read_nat32())
             }
+            _ => unimplemented!(),
         }
     }
 
@@ -61,7 +62,8 @@ impl<'container> IrContainerIterator<'container> {
     }
 
     unsafe fn read_register_id(&mut self) -> RegisterId {
-        mem::transmute(self.read_nat8())
+        unimplemented!()
+        //mem::transmute(self.read_nat8())
     }
 
     unsafe fn read_nat32(&mut self) -> u32 {
