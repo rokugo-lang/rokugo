@@ -34,15 +34,15 @@ impl<'c> IntoIterator for &'c IrContainer {
     }
 }
 
-pub struct IrContainerIterator<'container> {
-    container: &'container IrContainer,
+pub struct IrContainerIterator<'c> {
+    container: &'c IrContainer,
     index: usize,
 }
 
-impl<'container> IrContainerIterator<'container> {
+impl<'c> IrContainerIterator<'c> {
     /// # Safety
     /// Caller must ensure that the data is valid IR in valid version.
-    unsafe fn read_instruction(&mut self) -> IrInstruction<'container> {
+    unsafe fn read_instruction(&mut self) -> IrInstruction<'c> {
         match self.read_op_code() {
             // ! Local Memory
             IrOpCode::AllocRegisterNat32 => {
@@ -92,8 +92,8 @@ impl<'container> IrContainerIterator<'container> {
     }
 }
 
-impl<'container> Iterator for IrContainerIterator<'container> {
-    type Item = IrInstruction<'container>;
+impl<'c> Iterator for IrContainerIterator<'c> {
+    type Item = IrInstruction<'c>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.index < self.container.data.len() {

@@ -33,12 +33,12 @@ impl<'c> IntoIterator for &'c MirContainer {
     }
 }
 
-pub struct MirContainerIterator<'container> {
-    content: &'container MirContainer,
+pub struct MirContainerIterator<'c> {
+    content: &'c MirContainer,
     index: usize,
 }
 
-impl<'container> MirContainerIterator<'container> {
+impl<'c> MirContainerIterator<'c> {
     unsafe fn read_native<T>(&mut self) -> T {
         let mut value = mem::MaybeUninit::<T>::uninit();
         let ptr = value.as_mut_ptr() as *mut u8;
@@ -50,7 +50,7 @@ impl<'container> MirContainerIterator<'container> {
         value.assume_init()
     }
 
-    unsafe fn read_native_slice<T>(&mut self, count: usize) -> &'container [T] {
+    unsafe fn read_native_slice<T>(&mut self, count: usize) -> &'c [T] {
         let ptr = self.content.data.as_ptr().byte_add(self.index) as *const T;
         let slice = std::slice::from_raw_parts(ptr, count);
         self.index += mem::size_of::<T>() * count;
@@ -60,7 +60,7 @@ impl<'container> MirContainerIterator<'container> {
     unsafe fn read_instruction(
         &mut self,
         meta: &mut MirInstructionMeta,
-    ) -> Option<MirInstructionData<'container>> {
+    ) -> Option<MirInstructionData<'c>> {
         let op_code: MirOpCode = self.read_native();
         match op_code {
             // ! Memory
