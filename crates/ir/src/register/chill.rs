@@ -1,5 +1,9 @@
+#![doc = include_str!("../../../../docs/ir/register/chilling.md")]
+
 /// Container which holds the registers which are most optimal to chill in the current context.
+///
 /// # Remarks
+///
 /// This is a hint to the JIT compiler to chill one of these registers if all of them are busy, by previous
 /// instructions.
 #[non_exhaustive]

@@ -9,7 +9,7 @@ pub enum IrOpCode {
     /// # Layout
     ///
     /// - [`RegisterId`] - defined register
-    /// - [`RegisterChill`] - most optimal registers to chill
+    /// - [`RegisterChill`] - most optimal registers to [chill][crate::register::chill]
     AllocRegisterNat32,
 
     /// Drops a virtual register, what preverts it from being chilled.
