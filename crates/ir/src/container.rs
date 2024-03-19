@@ -43,19 +43,25 @@ impl<'c> IrContainerIterator<'c> {
     /// # Safety
     /// Caller must ensure that the data is valid IR in valid version.
     unsafe fn read_instruction(&mut self) -> IrInstruction<'c> {
-        match self.read_op_code() {
+        const ALLOC_REGISTER_NAT32: u16 = IrOpCode::AllocRegisterNat32.into_inner();
+        const DROP_REGISTER: u16 = IrOpCode::DropRegister.into_inner();
+        const LOAD_NAT32: u16 = IrOpCode::LoadNat32.into_inner();
+
+        match self.read_nat16() {
             // ! Local Memory
-            IrOpCode::AllocRegisterNat32 => {
+            ALLOC_REGISTER_NAT32 => {
                 const REGISTER_CHILL_SIZE: usize = mem::size_of::<RegisterChill>();
                 IrInstruction::AllocRegisterNat32(
                     self.read_register_id(),
                     RegisterChill::from_le_bytes(&self.read_byte_array::<REGISTER_CHILL_SIZE>()),
                 )
             }
-            IrOpCode::DropRegister => IrInstruction::DropRegister(self.read_register_id()),
-            IrOpCode::LoadNat32 => {
-                IrInstruction::LoadNat32(self.read_register_id(), self.read_nat32())
-            }
+            DROP_REGISTER => IrInstruction::DropRegister(self.read_register_id()),
+            LOAD_NAT32 => IrInstruction::LoadNat32(self.read_register_id(), self.read_nat32()),
+            _ => panic!(
+                "Invalid IR op code at byte index {}",
+                self.index - mem::size_of::<IrOpCode>()
+            ),
         }
     }
 
@@ -65,12 +71,6 @@ impl<'c> IrContainerIterator<'c> {
             .unwrap();
         self.index += LENGTH;
         array
-    }
-
-    /// # Safety
-    /// Caller must ensure that the next bytes in data is a valid [`IrOpCode`].
-    unsafe fn read_op_code(&mut self) -> IrOpCode {
-        mem::transmute(u16::from_le_bytes(self.read_byte_array()))
     }
 
     /// # Safety

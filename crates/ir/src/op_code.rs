@@ -32,6 +32,12 @@ pub enum IrOpCode {
     LoadNat32,
 }
 
+impl IrOpCode {
+    pub(crate) const fn into_inner(self) -> u16 {
+        self as u16
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum IrInstruction<'container> {
     // ! Local Memory
