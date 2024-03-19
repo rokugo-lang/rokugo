@@ -1,4 +1,5 @@
 use crate::emit::{
+    container::MirContainer,
     emitter::MirEmitter,
     op_code::{MirInstructionData, MirInstructionMeta},
 };
@@ -10,7 +11,7 @@ fn emit_and_assert<const LENGTH: usize>(
     let data = f(&mut mir);
 
     let mut i = 0;
-    for instruction in mir.iter() {
+    for instruction in MirContainer::from(mir).iter() {
         assert_eq!(data[i], instruction.data);
         i += 1;
     }
@@ -21,7 +22,7 @@ fn emit_and_assert<const LENGTH: usize>(
 fn emit_meta_and_assert(f: fn(&mut MirEmitter) -> MirInstructionMeta) {
     let mut mir = MirEmitter::new();
     let data = f(&mut mir);
-    assert_eq!(data, mir.iter().next().unwrap().meta);
+    assert_eq!(data, MirContainer::from(mir).iter().next().unwrap().meta);
 }
 
 // ! Memory

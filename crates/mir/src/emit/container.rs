@@ -1,5 +1,6 @@
 use std::{mem, ops::Range};
 
+use bytemuck::Pod;
 use rokugo_common::color::ColoredDisplay;
 
 use super::op_code::{MirInstruction, MirInstructionData, MirInstructionMeta, MirOpCode};
@@ -17,19 +18,15 @@ impl MirContainer {
         }
     }
 
-    pub(super) fn emit_native_bytes<T>(&mut self, value: T) {
-        // SAFETY: This is safe, because `T` lifetime does not exceed the lifetime of slice, and this slice is only used
-        // for copying bytes.
-        let slice = unsafe {
-            std::slice::from_raw_parts(&value as *const _ as *const u8, std::mem::size_of::<T>())
-        };
-        self.data.extend_from_slice(slice);
+    pub(super) fn emit_native_bytes(&mut self, value: impl Pod) {
+        let bytes = bytemuck::bytes_of(&value);
+        self.data.extend_from_slice(bytes);
     }
 }
 
-impl<'container> IntoIterator for &'container MirContainer {
-    type Item = MirInstruction<'container>;
-    type IntoIter = MirContainerIterator<'container>;
+impl<'c> IntoIterator for &'c MirContainer {
+    type Item = MirInstruction<'c>;
+    type IntoIter = MirContainerIterator<'c>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()

@@ -20,10 +20,6 @@ impl MirEmitter {
             content: MirContainer { data: Vec::new() },
         }
     }
-
-    pub fn iter(&self) -> MirContainerIterator {
-        self.content.iter()
-    }
 }
 
 /// # Memory
@@ -32,7 +28,7 @@ impl MirEmitter {
     pub fn define_nat32(&mut self, value: u32) -> ValueId {
         self.emit(MirOpCode::DefineNat32);
 
-        // SAFETY: This function creates a new value id, and registring it in scope.
+        // SAFETY: This function creates a new value id, and registrs it in scope.
         let value_id = unsafe { self.next_value_id() };
 
         self.emit_value_id(value_id);
@@ -45,7 +41,7 @@ impl MirEmitter {
     pub fn define_int32(&mut self, value: i32) -> ValueId {
         self.emit(MirOpCode::DefineInt32);
 
-        // SAFETY: This function creates a new value id, and registring it in scope.
+        // SAFETY: This function creates a new value id, and registrs it in scope.
         let value_id = unsafe { self.next_value_id() };
 
         self.emit_value_id(value_id);
@@ -73,7 +69,7 @@ impl MirEmitter {
     ) -> ValueId {
         self.emit(MirOpCode::Call);
 
-        // SAFETY: This function creates a new value id, and registring it in scope.
+        // SAFETY: This function creates a new value id, and registrs it in scope.
         let value_id = unsafe { self.next_value_id() };
 
         self.emit_value_id(value_id);
@@ -121,7 +117,7 @@ impl MirEmitter {
     /// This function is unsafe because it can cause a compiler or runtime panic if the `op_code` is not properly.
     /// The caller must ensure that the `op_code` have properly values.
     fn emit(&mut self, op_code: MirOpCode) {
-        self.content.emit_native_bytes(op_code);
+        self.content.emit_native_bytes(op_code as u8);
     }
 
     fn emit_function_id(&mut self, function_id: FunctionId) {

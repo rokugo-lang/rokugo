@@ -2,7 +2,10 @@
 
 use std::fmt::Display;
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+use bytemuck::{Pod, Zeroable};
+
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Zeroable, Pod)]
 pub struct ValueId(u32);
 
 impl Display for ValueId {
@@ -11,7 +14,8 @@ impl Display for ValueId {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Zeroable, Pod)]
 pub struct FunctionId(u64);
 
 impl Display for FunctionId {
@@ -20,7 +24,8 @@ impl Display for FunctionId {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Zeroable, Pod)]
 pub struct UnstableTypeId(u64);
 
 impl UnstableTypeId {

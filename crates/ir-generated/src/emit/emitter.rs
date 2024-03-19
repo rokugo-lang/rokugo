@@ -41,9 +41,11 @@ impl IrEmitter {
     }
 
     /// Drops a virtual register, what preverts it from being chilled.
+    ///
     /// # Remarks
+    ///
     /// This instruction is not dropping any memory like pointer etc. It is only a hint to the JIT compiler.
-    pub fn drop_register<T: Register>(&mut self, register: RegisterDropGuard<T>) -> &mut Self {
+    pub fn drop_register(&mut self, register: RegisterDropGuard<impl Register>) -> &mut Self {
         self.register_allocator.drop(register.id());
         #[cfg(debug_assertions)]
         mem::forget(register);

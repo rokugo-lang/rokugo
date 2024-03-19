@@ -7,17 +7,26 @@ use rokugo_ir::register::{self, Register, RegisterId};
 
 use crate::errors::register::RegisterAllocationError;
 
-pub struct RegisterDropGuard<T: Register> {
+pub struct RegisterDropGuard<T>
+where
+    T: Register,
+{
     register: T,
 }
 
-impl<T: Register> RegisterDropGuard<T> {
+impl<T> RegisterDropGuard<T>
+where
+    T: Register,
+{
     pub(crate) fn new(register: T) -> Self {
         Self { register }
     }
 }
 
-impl<T: Register> Deref for RegisterDropGuard<T> {
+impl<T> Deref for RegisterDropGuard<T>
+where
+    T: Register,
+{
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -26,7 +35,10 @@ impl<T: Register> Deref for RegisterDropGuard<T> {
 }
 
 #[cfg(debug_assertions)]
-impl<T: Register> Drop for RegisterDropGuard<T> {
+impl<T> Drop for RegisterDropGuard<T>
+where
+    T: Register,
+{
     fn drop(&mut self) {
         panic!("Register was dropped without DropRegister instruction")
     }
@@ -58,7 +70,7 @@ impl RegisterAllocator {
 
     fn get_dropped(&mut self, range: Range<u16>) -> Option<RegisterId> {
         if let Some(index) = self.dropped_registers.iter().position(|x| {
-            let unwrapped = x.unwrap();
+            let unwrapped = x.into_inner();
             unwrapped >= range.start && unwrapped < range.end
         }) {
             Some(self.dropped_registers.remove(index))

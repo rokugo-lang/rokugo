@@ -46,8 +46,8 @@ pub enum MirInstructionData<'content> {
     Call(ValueId, FunctionId, &'content [ValueId]),
 }
 
+#[non_exhaustive]
 #[derive(Debug, Default, PartialEq)]
 pub struct MirInstructionMeta {
     pub span: Option<Range<usize>>,
-    pub _default: (),
 }

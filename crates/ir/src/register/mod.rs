@@ -45,7 +45,7 @@ impl RegisterId {
     }
 
     /// Unwraps the register id to internal value.
-    pub fn unwrap(self) -> u16 {
+    pub fn into_inner(self) -> u16 {
         self.0
     }
 }

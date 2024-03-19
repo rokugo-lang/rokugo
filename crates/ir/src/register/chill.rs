@@ -2,10 +2,9 @@
 /// # Remarks
 /// This is a hint to the JIT compiler to chill one of these registers if all of them are busy, by previous
 /// instructions.
+#[non_exhaustive]
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct RegisterChill {
-    _default: (),
-}
+pub struct RegisterChill {}
 
 impl RegisterChill {
     pub fn from_le_bytes(bytes: &[u8]) -> Self {

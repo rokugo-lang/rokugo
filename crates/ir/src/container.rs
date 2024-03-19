@@ -6,7 +6,7 @@ use crate::{
 };
 
 pub struct IrContainer {
-    _data: Vec<u8>,
+    data: Vec<u8>,
 }
 
 impl IrContainer {
@@ -14,7 +14,7 @@ impl IrContainer {
     /// This function can receive any data and it is up to the caller to ensure that the data is valid IR in valid
     /// version.
     pub unsafe fn from_vec(data: Vec<u8>) -> Self {
-        IrContainer { _data: data }
+        IrContainer { data }
     }
 
     pub fn iter(&self) -> IrContainerIterator {
@@ -25,9 +25,9 @@ impl IrContainer {
     }
 }
 
-impl<'container> IntoIterator for &'container IrContainer {
-    type Item = IrInstruction<'container>;
-    type IntoIter = IrContainerIterator<'container>;
+impl<'c> IntoIterator for &'c IrContainer {
+    type Item = IrInstruction<'c>;
+    type IntoIter = IrContainerIterator<'c>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
@@ -60,7 +60,7 @@ impl<'container> IrContainerIterator<'container> {
     }
 
     fn read_byte_array<const LENGTH: usize>(&mut self) -> [u8; LENGTH] {
-        let array = self.container._data[self.index..self.index + LENGTH]
+        let array = self.container.data[self.index..self.index + LENGTH]
             .try_into()
             .unwrap();
         self.index += LENGTH;
@@ -96,7 +96,7 @@ impl<'container> Iterator for IrContainerIterator<'container> {
     type Item = IrInstruction<'container>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.index < self.container._data.len() {
+        if self.index < self.container.data.len() {
             // SAFETY: `IrContainerIterator` can be created only from `IrContainer` which forces ensuring data to be
             // valid IR in current version.
             Some(unsafe { self.read_instruction() })
