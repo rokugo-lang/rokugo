@@ -36,8 +36,10 @@ impl IrEmitter {
         self.emit_register_id(id);
         self.data.extend_from_slice(&chill.to_le_bytes());
 
-        // SAFETY: This is safe, because `RegisterNat32` is a wrapper around `RegisterId`.
-        Ok(RegisterDropGuard::new(unsafe { mem::transmute(id) }))
+        // SAFETY: This is safe, because this `id` is allocated with expected type by `RegisterAllocator`.
+        Ok(RegisterDropGuard::new(unsafe {
+            RegisterNat32::new_unchecked(id)
+        }))
     }
 
     /// Drops a virtual register, what preverts it from being chilled.
