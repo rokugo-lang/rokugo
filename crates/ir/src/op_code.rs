@@ -1,6 +1,8 @@
+use num_enum::TryFromPrimitive;
+
 use crate::register::{chill::RegisterChill, RegisterId};
 
-#[derive(Debug)]
+#[derive(Debug, TryFromPrimitive)]
 #[repr(u16)]
 pub enum IrOpCode {
     // ! Local Memory
@@ -30,12 +32,6 @@ pub enum IrOpCode {
     /// - [`RegisterId`] - destination register
     /// - [`u32`] - literal value
     LoadNat32,
-}
-
-impl IrOpCode {
-    pub(crate) const fn into_inner(self) -> u16 {
-        self as u16
-    }
 }
 
 #[derive(Debug, PartialEq)]

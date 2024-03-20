@@ -1,6 +1,7 @@
 use std::mem;
 
 use crate::{
+    instruction_read_error::IrInstructionReadError,
     op_code::{IrInstruction, IrOpCode},
     register::{chill::RegisterChill, RegisterId},
 };
@@ -26,7 +27,7 @@ impl IrContainer {
 }
 
 impl<'c> IntoIterator for &'c IrContainer {
-    type Item = IrInstruction<'c>;
+    type Item = Result<IrInstruction<'c>, IrInstructionReadError>;
     type IntoIter = IrContainerIterator<'c>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -42,26 +43,30 @@ pub struct IrContainerIterator<'c> {
 impl<'c> IrContainerIterator<'c> {
     /// # Safety
     /// Caller must ensure that the data is valid IR in valid version.
-    unsafe fn read_instruction(&mut self) -> IrInstruction<'c> {
-        const ALLOC_REGISTER_NAT32: u16 = IrOpCode::AllocRegisterNat32.into_inner();
-        const DROP_REGISTER: u16 = IrOpCode::DropRegister.into_inner();
-        const LOAD_NAT32: u16 = IrOpCode::LoadNat32.into_inner();
-
-        match self.read_nat16() {
+    unsafe fn read_instruction(&mut self) -> Result<IrInstruction<'c>, IrInstructionReadError> {
+        let op_code = match IrOpCode::try_from(self.read_nat16()) {
+            Ok(op_code) => op_code,
+            Err(err) => {
+                return Err(IrInstructionReadError::InvalidOpCode(
+                    self.index - mem::size_of::<IrOpCode>(),
+                    err.number,
+                ))
+            }
+        };
+        match op_code {
             // ! Local Memory
-            ALLOC_REGISTER_NAT32 => {
+            IrOpCode::AllocRegisterNat32 => {
                 const REGISTER_CHILL_SIZE: usize = mem::size_of::<RegisterChill>();
-                IrInstruction::AllocRegisterNat32(
+                Ok(IrInstruction::AllocRegisterNat32(
                     self.read_register_id(),
                     RegisterChill::from_le_bytes(&self.read_byte_array::<REGISTER_CHILL_SIZE>()),
-                )
+                ))
             }
-            DROP_REGISTER => IrInstruction::DropRegister(self.read_register_id()),
-            LOAD_NAT32 => IrInstruction::LoadNat32(self.read_register_id(), self.read_nat32()),
-            _ => panic!(
-                "Invalid IR op code at byte index {}",
-                self.index - mem::size_of::<IrOpCode>()
-            ),
+            IrOpCode::DropRegister => Ok(IrInstruction::DropRegister(self.read_register_id())),
+            IrOpCode::LoadNat32 => Ok(IrInstruction::LoadNat32(
+                self.read_register_id(),
+                self.read_nat32(),
+            )),
         }
     }
 
@@ -93,7 +98,7 @@ impl<'c> IrContainerIterator<'c> {
 }
 
 impl<'c> Iterator for IrContainerIterator<'c> {
-    type Item = IrInstruction<'c>;
+    type Item = Result<IrInstruction<'c>, IrInstructionReadError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.index < self.container.data.len() {

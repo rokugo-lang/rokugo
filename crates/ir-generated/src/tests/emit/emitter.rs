@@ -12,7 +12,7 @@ fn emit_and_assert<const LENGTH: usize>(f: fn(&mut IrEmitter) -> [IrInstruction<
 
     let mut i = 0;
     for instruction in IrContainer::from(ir).iter() {
-        assert_eq!(data[i], instruction);
+        assert_eq!(data[i], instruction.unwrap());
         i += 1;
     }
 
