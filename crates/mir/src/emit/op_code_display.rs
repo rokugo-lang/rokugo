@@ -54,6 +54,13 @@ impl ColoredDisplay for MirInstructionData<'_> {
     fn fmt_with_color(&self, f: &mut dyn WriteColor) -> io::Result<()> {
         match self {
             // ! Memory
+            MirInstructionData::DefineNat32(result, value) => {
+                write_result(f, result)?;
+                f.set_color(&COLOR_MEMORY.into())?;
+                write!(f, "DefineNat32 ")?;
+                f.reset()?;
+                write!(f, "{}", value)?;
+            }
             MirInstructionData::DefineInt32(result, value) => {
                 write_result(f, result)?;
                 f.set_color(&COLOR_MEMORY.into())?;

@@ -6,6 +6,10 @@ pub enum MirOpCode {
     // ! Memory
     /// # Layout
     /// - [`ValueId`] - Returned id of this value
+    /// - [`u32`] - Literal value assigned to this value
+    DefineNat32,
+    /// # Layout
+    /// - [`ValueId`] - Returned id of this value
     /// - [`i32`] - Literal value assigned to this value
     DefineInt32,
 
@@ -35,12 +39,14 @@ pub struct MirInstruction<'content> {
 #[derive(Debug, PartialEq)]
 pub enum MirInstructionData<'content> {
     // ! Memory
+    DefineNat32(ValueId, u32),
     DefineInt32(ValueId, i32),
     // ! Control flow
     ReturnValue(ValueId),
     Call(ValueId, FunctionId, &'content [ValueId]),
 }
 
+#[non_exhaustive]
 #[derive(Debug, Default, PartialEq)]
 pub struct MirInstructionMeta {
     pub span: Option<Range<usize>>,

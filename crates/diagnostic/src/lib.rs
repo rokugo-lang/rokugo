@@ -3,10 +3,13 @@
 pub(crate) mod files;
 mod render;
 
+use std::fmt;
+
 use rokugo_source_code::SourceSpan;
 
 pub use render::render;
 pub use render::Output;
+use rokugo_source_code::Sources;
 
 /// Diagnostic severity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -132,5 +135,17 @@ impl Diagnostic {
     pub fn with_child(mut self, child: Diagnostic) -> Self {
         self.children.push(child);
         self
+    }
+}
+
+impl fmt::Display for Diagnostic {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let render_bytes = render::render(
+            render::Output::Plain,
+            &Sources::default(),
+            vec![self.clone()],
+        );
+        writeln!(f, "{}", String::from_utf8_lossy(&render_bytes))?;
+        Ok(())
     }
 }

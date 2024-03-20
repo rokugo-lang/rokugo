@@ -6,8 +6,6 @@ edition = "2021"
 [dependencies]
 dashmap.workspace = true
 termcolor.workspace = true
+bytemuck = { workspace = true, features = ["derive"] }
 rokugo-common.workspace = true
 rokugo-backend-common.workspace = true
-
-[dev-dependencies]
-rokugo-common-tests.workspace = true

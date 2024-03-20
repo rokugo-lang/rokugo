@@ -12,6 +12,8 @@ rustc-hash = "1.1.0"
 termcolor = "1.1.2"
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
+bytemuck = "1.15.0"
+num_enum = "0.7.2"
 
 rokugo-common.path = "crates/common"
 rokugo-runtime.path = "crates/runtime"

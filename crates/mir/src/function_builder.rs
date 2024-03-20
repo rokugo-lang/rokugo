@@ -2,13 +2,13 @@ use std::{mem, sync::OnceLock};
 
 use rokugo_backend_common::{FunctionId, UnstableTypeId, ValueId};
 
-use crate::emit::{content::MirContent, parameter::Parameter};
+use crate::emit::{container::MirContainer, parameter::Parameter};
 
 #[derive(Debug)]
 pub struct FunctionBuilder {
     id: FunctionId,
     signature: FunctionSignature,
-    mir: OnceLock<MirContent>,
+    mir: OnceLock<MirContainer>,
 }
 
 impl FunctionBuilder {
@@ -40,11 +40,11 @@ impl FunctionBuilder {
         &self.signature
     }
 
-    pub fn mir(&self) -> Option<&MirContent> {
+    pub fn mir(&self) -> Option<&MirContainer> {
         self.mir.get()
     }
 
-    pub fn set_or_update_mir(&self, mir: MirContent) {
+    pub fn set_or_update_mir(&self, mir: MirContainer) {
         // TODO: Use another function to set the MIR, which will be allow to change the MIR once for every compilation.
         self.mir.set(mir).expect("MIR already set");
     }
