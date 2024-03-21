@@ -55,12 +55,14 @@ impl<'c> IrContainerIterator<'c> {
         };
         match op_code {
             // ! Local Memory
-            IrOpCode::AllocRegisterNat32 => {
+            IrOpCode::MarkRegisterChill => {
                 const REGISTER_CHILL_SIZE: usize = mem::size_of::<RegisterChill>();
-                Ok(IrInstruction::AllocRegisterNat32(
-                    self.read_register_id(),
+                Ok(IrInstruction::MarkRegisterChill(
                     RegisterChill::from_le_bytes(&self.read_byte_array::<REGISTER_CHILL_SIZE>()),
                 ))
+            }
+            IrOpCode::AllocRegisterNat32 => {
+                Ok(IrInstruction::AllocRegisterNat32(self.read_register_id()))
             }
             IrOpCode::DropRegister => Ok(IrInstruction::DropRegister(self.read_register_id())),
             IrOpCode::LoadNat32 => Ok(IrInstruction::LoadNat32(

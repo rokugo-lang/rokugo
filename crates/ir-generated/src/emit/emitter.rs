@@ -26,15 +26,21 @@ impl IrEmitter {
 
 /// # Local Memory
 impl IrEmitter {
+    /// Marks which virtual registers are most optimal to [chill][rokugo_ir::register::chill] in the current context.
+    pub fn mark_register_chill(&mut self, registers_to_chill: RegisterChill) -> &mut Self {
+        self.emit(IrOpCode::MarkRegisterChill);
+        self.data
+            .extend_from_slice(&registers_to_chill.to_le_bytes());
+        self
+    }
+
     /// Allocates a virtual register, or prepare a native register to store a new 32-bit natural value.
     pub fn alloc_register_nat32(
         &mut self,
-        chill: RegisterChill,
     ) -> Result<RegisterDropGuard<RegisterNat32>, RegisterAllocationError> {
         let id = self.register_allocator.next_nat32()?;
         self.emit(IrOpCode::AllocRegisterNat32);
         self.emit_register_id(id);
-        self.data.extend_from_slice(&chill.to_le_bytes());
 
         // SAFETY: This is safe, because this `id` is allocated with expected type by `RegisterAllocator`.
         Ok(RegisterDropGuard::new(unsafe {

@@ -6,12 +6,18 @@ use crate::register::{chill::RegisterChill, RegisterId};
 #[repr(u16)]
 pub enum IrOpCode {
     // ! Local Memory
+    /// Marks which virtual registers are most optimal to [chill][crate::register::chill] in the current context.
+    ///
+    /// # Layout
+    ///
+    /// - [`RegisterChill`] - most optimal registers to [chill][crate::register::chill]
+    MarkRegisterChill,
+
     /// Allocates a virtual register, or prepare a native register to store a new 32-bit natural value.
     ///
     /// # Layout
     ///
     /// - [`RegisterId`] - defined register
-    /// - [`RegisterChill`] - most optimal registers to [chill][crate::register::chill]
     AllocRegisterNat32,
 
     /// Drops a virtual register, what preverts it from being chilled.
@@ -37,7 +43,8 @@ pub enum IrOpCode {
 #[derive(Debug, PartialEq)]
 pub enum IrInstruction<'container> {
     // ! Local Memory
-    AllocRegisterNat32(RegisterId, RegisterChill),
+    MarkRegisterChill(RegisterChill),
+    AllocRegisterNat32(RegisterId),
     DropRegister(RegisterId),
     LoadNat32(RegisterId, u32),
     // ! Control Flow
