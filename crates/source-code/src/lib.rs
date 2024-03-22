@@ -33,6 +33,10 @@ impl Sources {
     pub fn get(&self, id: FileId) -> &File {
         &self.files[id.0]
     }
+
+    pub fn span(&self, span: &SourceSpan) -> &str {
+        &self.get(span.file_id).source[span.span.clone()]
+    }
 }
 
 /// Span of bytes inside of a source file.

@@ -5,6 +5,7 @@ use token::Token;
 
 mod lexer;
 pub mod token;
+pub mod token_set;
 
 /// Lex a file from the given source set into a set of tokens and diagnostics.
 pub fn lex(sources: &Sources, file_id: FileId) -> (Vec<Token>, Vec<Diagnostic>) {

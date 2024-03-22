@@ -4,8 +4,9 @@ pub mod arena;
 mod just_about_anything;
 mod name;
 
+#[cfg(debug_assertions)]
+use std::any::type_name;
 use std::{
-    any::type_name,
     fmt::Debug,
     future::Future,
     hash::{BuildHasherDefault, Hash},

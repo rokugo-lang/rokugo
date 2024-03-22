@@ -80,7 +80,16 @@ Then there are strings:
 
 Strings are UTF-8 encoded and have the type `String`.
 
-They are made up of characters, which have the type `Char` and use single-quoted literals:
+Notably, string literals cannot contain embedded newlines.
+
+```rokugo
+"Hello,
+world"  # error: string literals may not span multiple lines
+```
+
+There is currently no way around this as Rokugo also does not have a multiline string literal.
+
+Strings are made up of characters, which have the type `Char` and use single-quoted literals:
 
 ```rokugo
 'a'  # U+0061
@@ -259,6 +268,11 @@ let Colors =
     | :blue
 ```
 
+##### `->` function type operator
+
+`a -> r` is the type of a function which takes an argument of type `a` and returns a value of type `r`.
+It is the only operator in Rokugo which is right-associative rather than left-associative.
+
 ##### `@` annotation sigil
 
 Not actually an operator, but a token reserved for future use in annotations.
@@ -290,7 +304,7 @@ Fields from the old record can still be accessed like usual in the new record's 
 
 #### Precedence
 
-Precedence of operators in Rokugo is statically determined based on the characters the operator is made out of.
+A unique thing about Rokugo expressions is how it handles precedence.
 
 TODO: Precedence categories, how operators from different categories do not interact.
 
@@ -737,7 +751,7 @@ There is no other meaningful result that could be returned, since the body of a 
 #### `match` expression
 
 `match` allows for matching an expression sequentially against a set of [patterns](#patterns).
-It is used postfix after any expression:
+It returns a function, which is most commonly used together with the `|>` operator:
 
 ```rokugo
 let Rgb = :rgb Float32 Float32 Float32
@@ -745,11 +759,21 @@ let Rgba = :rgba Float32 Float32 Float32 Float32
 let Color = :transparent | Rgb | Rgba
 
 fun to_rgba (color : Color) : Rgba =
-    color match {
+    color |> match {
         :transparent => :rgba 0.0 0.0 0.0 0.0
         :rgb (let r) (let g) (let b) => :rgba r g b 1.0
         :rgba _ _ _ _ => color
     }
+```
+
+The `|>` can be omitted however, yielding a shorthand way to write functions which match on an input and transform it into something else.
+
+```rokugo
+let to_rgba : Color -> Rgba = match {
+    :transparent => :rgba 0.0 0.0 0.0 0.0
+    :rgb (let r) (let g) (let b) => :rgba r g b 1.0
+    :rgba _ _ _ _ => color
+}
 ```
 
 Each `pattern => expr` pair is called an _arm_.
@@ -820,7 +844,7 @@ fun interpret (code : List Instruction) : Nat32 = do {
     var pc : Offset = 0
     var result : Nat32 = 0
     while :true {
-        code |> List.at pc match {
+        code |> List.at pc |> match {
             :increment => set result = result + 1
             :double => set result = result * 2
             :halt => break
@@ -857,8 +881,8 @@ For example:
 ```rokugo
 let NumberWord = :one | :two | :three
 
-fun int_to_word (i : Int32) : Option NumberWord =
-    i match {
+let int_to_word : Int32 -> Option NumberWord =
+    match {
         1 => :some :one
         2 => :some :two
         3 => :some :three
@@ -928,7 +952,7 @@ let Expr =
 
 fun main () : () ~ Console = do {
     let e : Expr = :four 2.0
-    e match {
+    e |> match {
         :two (let x) | :four (let x) => Console.write_line (x |> Float32.to_string)
     }
 }
@@ -943,7 +967,7 @@ let Expr =
 
 fun main () : () ~ Console = do {
     let e : Expr = :four 2.0
-    e match {
+    e |> match {
         :two (let x) => Console.write_line (x |> Float32.to_string)
         _ => Console.write_line "four? what's that?"
     }
@@ -956,7 +980,7 @@ This extra pipe can be used even when the pattern is not an or-pattern, leading 
 ```rokugo
 fun main () : () ~ Console = do {
     let e : Expr = :four 2.0
-    e match {
+    e |> match {
         # Note the extra pipe here.
         | :two (let x) => Console.write_line (x |> Float32.to_string)
         | _ => Console.write_line "four? what's that?"
@@ -999,7 +1023,7 @@ Note that tuples must be matched exhaustively.
 Fields cannot be left unmatched:
 
 ```rokugo
-(1 : Int32, 2 : Int32, 3 : Int32) match {
+(1 : Int32, 2 : Int32, 3 : Int32) |> match {
     (let x, let y) => ()
     #            ^ error: tuple has 3 fields, but 2 were matched
 }
@@ -1008,7 +1032,7 @@ Fields cannot be left unmatched:
 To ignore fields, use an [and-pattern](#and-patterns-).
 
 ```rokugo
-(1 : Int32, 2 : Int32, 3 : Int32) match {
+(1 : Int32, 2 : Int32, 3 : Int32) |> match {
     (let x, let y) & _ => ()
 }
 ```
@@ -1072,8 +1096,9 @@ let ValueType =
     | :float
     | :string
 
-fun type_of (v : Value) : ValueType =
-    v match {
+# Ascribing a type to `let` also makes use of type patterns.
+let type_of : Value -> ValueType =
+    match {
         _ : Int64 => :int
         _ : Nat64 => :nat
         _ : Float64 => :float
