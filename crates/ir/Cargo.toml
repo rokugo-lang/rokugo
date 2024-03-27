@@ -5,5 +5,6 @@ edition = "2021"
 
 [dependencies]
 num_enum.workspace = true
+smallvec.workspace = true
 rokugo-diagnostic.workspace = true
 rokugo-common.workspace = true

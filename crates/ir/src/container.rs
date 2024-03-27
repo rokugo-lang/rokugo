@@ -6,6 +6,7 @@ use crate::{
     register::{chill::RegisterChill, RegisterId},
 };
 
+#[derive(Debug)]
 pub struct IrContainer {
     data: Vec<u8>,
 }
