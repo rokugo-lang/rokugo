@@ -2,23 +2,39 @@ use std::fmt::Display;
 
 use smallvec::SmallVec;
 
-use crate::register::RegisterId;
+use crate::{container::IrContainer, r#type::UnstableTypeId, register::RegisterId};
 
 pub mod collection;
 pub mod load_error;
 
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct Function {
     pub signature: FunctionSignature,
+    pub code: IrContainer,
+}
+
+impl Function {
+    pub fn new(signature: FunctionSignature, code: IrContainer) -> Self {
+        Self { signature, code }
+    }
 }
 
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct FunctionSignature {
     pub return_data: ReturnData,
 }
 
+impl FunctionSignature {
+    pub fn new(return_data: ReturnData) -> Self {
+        Self { return_data }
+    }
+}
+
 #[derive(Debug)]
 pub struct ReturnData {
+    pub return_type: UnstableTypeId,
     pub container: ReturnDataContainer,
 }
 

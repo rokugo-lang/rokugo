@@ -2,26 +2,37 @@ use std::fmt::Display;
 
 use smallvec::SmallVec;
 
+pub mod built_in;
+pub mod collection;
+
 #[derive(Debug)]
-pub enum Type {
-    Linear(LinearType),
+pub struct Type {
+    kind: TypeKind,
+}
+
+#[derive(Debug)]
+pub enum TypeKind {
+    BuiltIn(built_in::BuiltInType),
+    Regular(RegularType),
     GenericConstructed(GenericConstructedType),
 }
 
 #[derive(Debug)]
-pub struct LinearType {
+pub struct RegularType {
     fields: SmallVec<[UnstableTypeId; 4]>,
 }
 
 #[derive(Debug)]
 pub struct GenericConstructedType {
-    parent_type_id: UnstableTypeId,
+    _parent_type_id: UnstableTypeId,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct UnstableTypeId(u64);
 
 impl UnstableTypeId {
+    pub const VOID: UnstableTypeId = UnstableTypeId(0);
+
     pub fn inner(self) -> u64 {
         self.0
     }
